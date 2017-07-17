@@ -1,0 +1,42 @@
+Pre-requisites:
+
+ - Maven 3.x
+ - Java 1.6 or above
+ 
+Tested Platform: 
+
+ - Microsoft WINDOWS V-7
+ - UBUNTU 14.04
+ - wso2esb-5.0.0
+ - Java 1.8
+
+1. Create Topic and start the zookeeper, kafka server and also producer to send a json/xml message to test the consumption via WSO2 ESB.
+
+2. Navigate to "<INBOUND_HOME>" and run the following command.
+        $ mvn clean install
+
+3. To use the Kafka inbound endpoint, you need to download the inbound jar from https://storepreview.wso2.com/store/ and copy the jar to the <ESB_HOME>/repository/components/dropins directory.
+
+4. Configuration:
+
+<?xml version="1.0" encoding="UTF-8"?>
+<inboundEndpoint xmlns="http://ws.apache.org/ns/synapse"
+                 name="kafka"
+                 sequence="request"
+                 onError="fault"
+                 class="org.wso2.carbon.inbound.kafka.KafkaEventBasedConsumer"
+                 suspend="false">
+   <parameters>
+      <parameter name="inbound.behavior">eventBased</parameter>
+      <parameter name="sequential">true</parameter>
+      <parameter name="coordination">true</parameter>
+      <parameter name="key.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
+      <parameter name="topic.names">test</parameter>
+      <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
+      <parameter name="poll.timeout">100</parameter>
+      <parameter name="group.id">test</parameter>
+      <parameter name="bootstrap.servers">localhost:9092</parameter>
+      <parameter name="contentType">application/json</parameter>
+   </parameters>
+</inboundEndpoint>
+
