@@ -154,6 +154,6 @@ Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
         </repository>
     </distributionManagement>
     <properties>
-        <carbon.mediation.version>4.6.17</carbon.mediation.version>
+        <carbon.mediation.version>4.4.10</carbon.mediation.version>
     </properties>
 </project>

@@ -22,14 +22,14 @@ package org.wso2.carbon.inbound.kafka;
  */
 public class KafkaConstants {
 
-    public static final String PARTITION_NO = "partitionNo";
-    public static final String MESSAGE_VALUE = "messageValue";
-    public static final String OFFSET = "offset";
-    public static final String TOPIC = "topic";
-    public static final String CHECKSUM = "checksum";
-    public static final String TIMESTAMP = "timestamp";
-    public static final String TIMESTAMP_TYPE = "timestampType";
-    public static final String KEY = "key";
+    public static final String KAFKA_PARTITION_NO = "partitionNo";
+    public static final String KAFKA_MESSAGE_VALUE = "messageValue";
+    public static final String KAFKA_OFFSET = "offset";
+    public static final String KAFKA_TOPIC = "topic";
+    public static final String KAFKA_CHECKSUM = "checksum";
+    public static final String KAFKA_TIMESTAMP = "timestamp";
+    public static final String KAFKA_TIMESTAMP_TYPE = "timestampType";
+    public static final String KAFKA_KEY = "key";
 
     //Mandatory parameter for Kafka Inbound Endpoint.
     public static final String TOPIC_NAMES = "topic.names";
