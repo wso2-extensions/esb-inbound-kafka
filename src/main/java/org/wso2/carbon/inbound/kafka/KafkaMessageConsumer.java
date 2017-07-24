@@ -315,10 +315,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer" + consumer);
-            isPolled = false;
             if (consumer != null) {
                 consumer.close();
             }
+            isPolled = false;
         }
     }
 
