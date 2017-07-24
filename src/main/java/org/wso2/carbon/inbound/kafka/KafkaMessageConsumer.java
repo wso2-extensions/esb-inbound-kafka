@@ -301,8 +301,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             while (true) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
                 for (ConsumerRecord record : records) {
-                    MessageContext msgCtx;
-                    msgCtx = createMessageContext();
+                    MessageContext msgCtx = createMessageContext();
                     msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
                     msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
                     msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
