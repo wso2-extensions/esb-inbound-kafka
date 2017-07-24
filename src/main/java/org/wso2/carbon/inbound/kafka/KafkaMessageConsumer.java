@@ -316,7 +316,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer" + consumer);
-        } finally {
             if (consumer != null) {
                 consumer.close();
             }
@@ -417,7 +416,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     public Object poll() {
         /*
           In this case we only poll first time and listen to get the record.
-          Can't use EventBasedConsumer because it is not supported in version 4.9.0.
+          Can't use EventBasedConsumer because it is not supported in ESB version 4.9.0.
          */
         if (!isPolled) {
             consumeKafkaRecords();
@@ -432,7 +431,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     public void destroy() {
         try {
             if (consumer != null) {
-                consumer.close();
+                consumer.wakeup();
                 if (log.isDebugEnabled()) {
                     log.debug("The Kafka consumer has been close ! for " + name);
                 }
