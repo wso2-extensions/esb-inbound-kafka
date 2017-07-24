@@ -53,7 +53,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private static final Log log = LogFactory.getLog(KafkaMessageConsumer.class);
 
     private KafkaConsumer<byte[], byte[]> consumer;
-    private MessageContext msgCtx;
 
     private String bootstrapServersName;
     private String keyDeserializer;
@@ -302,6 +301,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             while (true) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
                 for (ConsumerRecord record : records) {
+                    MessageContext msgCtx;
                     msgCtx = createMessageContext();
                     msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
                     msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
@@ -311,25 +311,24 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
                     msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
                     msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-                    injectMessage(record.value().toString(), contentType);
+                    injectMessage(record.value().toString(), contentType, msgCtx);
                 }
             }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer" + consumer);
+            isPolled = false;
             if (consumer != null) {
                 consumer.close();
             }
         }
     }
 
-    @Override
-    protected boolean injectMessage(String strMessage, String contentType) {
+    private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
         AutoCloseInputStream in = new AutoCloseInputStream(new ByteArrayInputStream(strMessage.getBytes()));
-        return this.injectMessage(in, contentType);
+        return this.injectMessage(in, contentType, msgCtx);
     }
 
-    @Override
-    protected boolean injectMessage(InputStream in, String contentType) {
+    private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
         try {
             if (log.isDebugEnabled()) {
                 log.debug("Processed Custom inbound EP Message of Content-type : " + contentType + " for " + name);
@@ -416,7 +415,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     public Object poll() {
         /*
           In this case we only poll first time and listen to get the record.
-          Can't use EventBasedConsumer because it is not supported in ESB version 4.9.0.
+          Can't use EventBasedConsumer because it is not supported in version 4.9.0.
          */
         if (!isPolled) {
             consumeKafkaRecords();
