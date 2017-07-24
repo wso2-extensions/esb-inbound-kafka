@@ -315,11 +315,14 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer" + consumer);
+        } catch (Exception ex) {
+            log.error("Error while close the consumer" + ex);
+        } finally {
             if (consumer != null) {
                 consumer.close();
             }
-            isPolled = false;
         }
+        isPolled = false;
     }
 
     private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
