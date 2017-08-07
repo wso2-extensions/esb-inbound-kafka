@@ -26,6 +26,7 @@ import org.apache.commons.io.input.AutoCloseInputStream;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -312,7 +313,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
                     injectMessage(record.value().toString(), contentType, msgCtx);
                 }
+                if (!records.isEmpty()) {
+                    consumer.commitAsync();
+                }
             }
+        } catch (CommitFailedException ex) {
+            log.error("Kafka commit failed for topic", ex);
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer" + consumer);
         } catch (Exception ex) {
