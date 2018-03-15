@@ -310,6 +310,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
                     msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
                     msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
+                    msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
                     injectMessage(record.value().toString(), contentType, msgCtx);
                 }
             }

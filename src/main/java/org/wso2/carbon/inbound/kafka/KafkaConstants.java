@@ -22,6 +22,7 @@ package org.wso2.carbon.inbound.kafka;
  */
 public class KafkaConstants {
 
+    public static final String KAFKA_INBOUND_ENDPOINT_NAME = "inbound.endpoint.name";
     public static final String KAFKA_PARTITION_NO = "partitionNo";
     public static final String KAFKA_MESSAGE_VALUE = "messageValue";
     public static final String KAFKA_OFFSET = "offset";
