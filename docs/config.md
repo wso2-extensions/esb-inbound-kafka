@@ -1,15 +1,15 @@
 # Configuring the Kafka Inbound Operation
 
-WSO2 ESB's Kafka inbound endpoint acts as a message consumer. It creates a connection to zookeeper and requests messages for either a topic, topics or topic filters.
+WSO2 ESB's Kafka inbound endpoint acts as a message consumer. It creates a connection to ZooKeeper and requests messages for either a topic, topics, or topic filters.
 
 To use the Kafka inbound endpoint, download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
 
->>The recommended version is [kafka_2.12-0.11.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka that you can download, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
+>>The recommended version of Kafka for the Kafka inbound endpoint is [kafka_2.12-0.11.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
 
->>Download the kafka_2.12-0.11.0.0.tgz from [here](http://kafka.apache.org/downloads) and extract it. Here `<kafka_2.12-0.11.0.0>` refered as `<KAFKA_HOME>` .
+>>Download the kafka_2.12-0.11.0.0.tgz from [here](http://kafka.apache.org/downloads) and extract it. Let's call this directory <KAFKA_HOME>.
 
 
-To configure the Kafka inbound endpoint, copy the following client libraries from the `<KAFKA_HOME>/lib` directory to the `<ESB_HOME>/repository/components/lib` directory.
+To configure the Kafka inbound endpoint, copy the following client libraries from <KAFKA_HOME>/lib to <ESB_HOME>/repository/components/lib.
                 
 1. [kafka_2.12-0.11.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/0.11.0.0)
 2. [kafka-clients-0.11.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/0.11.0.0)
@@ -18,19 +18,19 @@ To configure the Kafka inbound endpoint, copy the following client libraries fro
 5. [zookeeper-3.4.10.jar](https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper/3.4.10)
 6. [scala-library-2.12.2.jar](https://mvnrepository.com/artifact/org.scala-lang/scala-library/2.12.2)
 
-Run the following command to start the ZooKeeper server :
+Run the following command to start the ZooKeeper server:
     
     bin/zookeeper-server-start.sh config/zookeeper.properties
     
-Run the following command to start the Kafka server :
+Run the following command to start the Kafka server:
 
     bin/kafka-server-start.sh config/server.properties
     
     
 ## Sample configuration
 
-1. Following is a sample kafka configuration that can consume messages using the specified topic or topics:
-    >>Note : This configuration does not include the security parameters.
+1. Given below is a sample Kafka configuration that can consume messages using a given topic or topics:
+    >>Note: This configuration does not include security.
 
     #### Inbound Configuration without security
     
@@ -57,11 +57,11 @@ Run the following command to start the Kafka server :
     </inboundEndpoint>
     ```
     
-    It is also possible to add the above inbound configuration via the Management Console :
+    You can add the above inbound configuration via the Management Console too:
             ![alt text](images/inbound_config.png)
 
-2. Following is a sample kafka configuration that can consume messages using the specified topic or topics :
-    >>Note : This configuration includes security parameters.
+2. Given below is a sample Kafka configuration that can consume messages using a given topic or topics :
+    >>Note : This configuration includes security.
     
     #### Inbound configuration with security
     
@@ -94,35 +94,35 @@ Run the following command to start the Kafka server :
     </inboundEndpoint>
     ```
     
-    >> Note : Ensure that you provide the sequential, and coordination parameters as specified in the above configuration.
+    >> Note : Make sure that you provide the sequential and coordination parameters as shown in the above configuration.
     
-    You can add the above inbound configuration via the Management Console as well :
+    You can add the above inbound configuration via the Management Console as well:
     ![alt text](images/inbound_config_security.png)
     
 ### Kafka inbound endpoint parameters
 
-Following are descriptions of all possible parameters that you can set in a Kafka configuration :
+Given below are the descriptions of all possible parameters that you can set in a Kafka configuration:
 
 | Parameter | Description | Required | Possible values |
 | ------------- | ------------- | ------------- | ------------- |
 | bootstrap.servers | A list of host or port pairs that you can use to establish the initial connection to the Kafka cluster | Yes | localhost:9092, localhost:9093 |
 | key.deserializer | The deserialiser class for the key that implements the Deserializer interface | Yes | class |
 | value.deserializer | The deserialiser class for the value that implements the Deserializer interface | Yes | class |
-| topic.names | A comma separated list of topic names to consume the messages | Yes | String |
+| topic.names | A comma-separated list of topic names to consume the messages | Yes | String |
 | group.id | The unique string that identifies the consumer group that a consumer belongs to | Yes | String |
 | contentType | The message content type | Yes | application/json, application/xml, text/plain |
 | pollTimeout | The amount of time to block the consumer to consume messages | Yes | Long |
-| ssl.keystore.location | The location of the keystore file. Specifying this is optional for the client, and can be used in two-way authentication for the client | Required for security enabled configurations | String |
-| ssl.keystore.password | The password for the keystore file. Specifying this is optional for the client, and is only required if the ssl.keystore.location parameter is configured | Required for security enabled configurations | Password |
+| ssl.keystore.location | The location of the keystore file. Specifying this is optional for the client and can be used in two-way authentication for the client | Required for security enabled configurations | String |
+| ssl.keystore.password | The password for the keystore file. Specifying this is optional for the client and is only required if the ssl.keystore.location parameter is configured | Required for security enabled configurations | Password |
 | ssl.truststore.location | The location of the truststore file | Required for security enabled configurations | String |
-| ssl.truststore.password | The password for the truststore file. **Note :** If you do not set a password, access to the truststore will still be available, but integrity checking will be disabled | Required for security enabled configurations | Password |
+| ssl.truststore.password | The password for the truststore file. **Note :** If you do not set a password, access to the truststore will still be available but integrity checking will be disabled | Required for security enabled configurations | Password |
 | security.protocol | The protocol used to communicate with brokers. Possible values are: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL | Required for security enabled configurations | SSL, PLAINTEXT |
 
 For more information on Kafka configuration parameters, see the [Kafka Documentation](https://kafka.apache.org/documentation/#newconsumerconfigs).
 
 ### Enabling security for Kafka producers and consumers
 
-For detailed information on how to enable TLS authentication for Kafka brokers, producers and consumers, see [Enabling Security](enableSecurity.md).
+For detailed information on how to enable TLS authentication for Kafka brokers, producers, and consumers, see [Enabling Security](enableSecurity.md).
 
 ### Working with Kafka clients/producers
 
@@ -132,23 +132,21 @@ Kafka versions 0.9.0.0 and above support TLS. Enabling security for Kafka produc
 
 The parameters you need to specify to support TLS is the same for both producers and consumers. It is required to specify the security protocol as well as the truststore and keystore information since you are using mutual authentication:
 
-Let's take a look at how to use a Kafka producer to 
+Let's take a look at how to use a Kafka producer to start producing messages. First, either start the console producer or use the Kafka connector to produce the message. You can start the producer with or without security.
 
-For the producer to start producing messages, you should either start the console producer, or use the Kafka connector to produce the message. You can start the producer either with security, or without security based on your requirement.
-
-To start the console producer without security, execute the following command :
+To start the console producer without security, execute the following command:
 
     bin/kafka-console-producer.sh --broker-list localhost:9093 --topic test
 
 Alternatively, you can use the Kafka connector without security.
 
-To start the console producer with security, execute the following command :
+To start the console producer with security, execute the following command:
 
     kafka-console-producer –broker-list localhost:9093 –topic test –producer.config {file-path}/producer_ssl.properties
 
 Alternatively, you can use the Kafka connector with security.
 
-Use the following configuration to enable security for the console producer :
+Use the following configuration to enable security for the console producer:
 
     security.protocol=SSL
     ssl.truststore.location={file-path}/kafka.client.truststore.jks
@@ -160,7 +158,7 @@ Use the following configuration to enable security for the console producer :
 >>**Note :** If the passwords are stored in the client configuration, it is important to restrict access to the file via filesystem permission.
 
 
-Send the following message using console producer or the Kafka connector :
+Send the following message using the console producer or the Kafka connector:
 
     {"test":"wso2"}
     {"test":"wso2"}
@@ -169,7 +167,7 @@ Send the following message using console producer or the Kafka connector :
     
 ### Configuring the sample scenario  
     
-Create a sample sequence as below :
+Create a sample sequence as follows:
 
 ```xml
 <sequence xmlns="http://ws.apache.org/ns/synapse" name="request" onError="fault">
@@ -192,7 +190,7 @@ Create a sample sequence as below :
 </sequence>
 ```
 
-Create a sample fault sequence as below :
+Create a sample fault sequence as follows:
 
 ```xml
 <sequence xmlns="http://ws.apache.org/ns/synapse" name="fault">
@@ -211,10 +209,6 @@ Create a sample fault sequence as below :
 
 ### Testing the sample scenario
 
-The ESB debug log will display an INFO message as follows after produce a message using console producer or the connector.
-
-### Analyzing the output
-
-The ESB debug log will display an INFO message as follows :
+The ESB debug log displays an INFO message as follows after produce a message using the console producer or the connector.
 
 ![alt text](images/output.png)
