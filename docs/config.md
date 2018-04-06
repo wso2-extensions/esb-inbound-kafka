@@ -4,19 +4,19 @@ WSO2 ESB's Kafka inbound endpoint acts as a message consumer. It creates a conne
 
 To use the Kafka inbound endpoint, download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
 
->>The recommended version of Kafka for the Kafka inbound endpoint is [kafka_2.12-0.11.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
+>>The recommended version of Kafka for the Kafka inbound endpoint is [kafka_2.12-1.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
 
->>Download the kafka_2.12-0.11.0.0.tgz from [here](http://kafka.apache.org/downloads) and extract it. Let's call this directory <KAFKA_HOME>.
+>>Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
 
 
 To configure the Kafka inbound endpoint, copy the following client libraries from <KAFKA_HOME>/lib to <ESB_HOME>/repository/components/lib.
                 
-1. [kafka_2.12-0.11.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/0.11.0.0)
-2. [kafka-clients-0.11.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/0.11.0.0)
-3. [zkclient-0.10.jar](https://mvnrepository.com/artifact/com.101tec/zkclient/0.10)
-4. [metrics-core-3.2.2.jar](https://mvnrepository.com/artifact/io.dropwizard.metrics/metrics-core/3.2.2)
-5. [zookeeper-3.4.10.jar](https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper/3.4.10)
-6. [scala-library-2.12.2.jar](https://mvnrepository.com/artifact/org.scala-lang/scala-library/2.12.2)
+* [kafka_2.12-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/1.0.0)  
+* [kafka-clients-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/1.0.0)
+* [metrics-core-2.2.0.jar](https://mvnrepository.com/artifact/com.yammer.metrics/metrics-core/2.2.0)
+* [scala-library-2.12.3.jar](https://mvnrepository.com/artifact/org.scala-lang/scala-library/2.12.3)
+* [zkclient-0.10.jar](https://mvnrepository.com/artifact/com.101tec/zkclient/0.10)
+* [zookeeper-3.4.10.jar](https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper/3.4.10)
 
 Run the following command to start the ZooKeeper server:
     
@@ -49,7 +49,7 @@ Run the following command to start the Kafka server:
           <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
           <parameter name="topic.names">test</parameter>
           <parameter name="poll.timeout">100</parameter>
-          <parameter name="bootstrap.servers">localhost:9093</parameter>
+          <parameter name="bootstrap.servers">localhost:9092</parameter>
           <parameter name="group.id">hello</parameter>
           <parameter name="contentType">application/json</parameter>
           <parameter name="key.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
@@ -80,7 +80,7 @@ Run the following command to start the Kafka server:
           <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
           <parameter name="topic.names">test</parameter>
           <parameter name="poll.timeout">100</parameter>
-          <parameter name="bootstrap.servers">localhost:9093</parameter>
+          <parameter name="bootstrap.servers">localhost:9092</parameter>
           <parameter name="group.id">hello</parameter>
           <parameter name="contentType">application/json</parameter>
           <parameter name="key.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
@@ -136,13 +136,13 @@ Let's take a look at how to use a Kafka producer to start producing messages. Fi
 
 To start the console producer without security, execute the following command:
 
-    bin/kafka-console-producer.sh --broker-list localhost:9093 --topic test
+    bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
 
 Alternatively, you can use the Kafka connector without security.
 
 To start the console producer with security, execute the following command:
 
-    kafka-console-producer –broker-list localhost:9093 –topic test –producer.config {file-path}/producer_ssl.properties
+    kafka-console-producer –broker-list localhost:9092 –topic test –producer.config {file-path}/producer_ssl.properties
 
 Alternatively, you can use the Kafka connector with security.
 

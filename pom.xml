@@ -21,7 +21,7 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.apache.synapse.inbound.kafka</groupId>
     <artifactId>org.apache.synapse.kafka.poll</artifactId>
-    <version>1.0.2-SNAPSHOT</version>
+    <version>1.0.2</version>
     <name>Kafka Polling Consumer</name>
     <url>http://wso2.org</url>
     <packaging>bundle</packaging>
@@ -153,6 +153,6 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
     </distributionManagement>
     <properties>
         <carbon.mediation.version>4.4.10</carbon.mediation.version>
-        <kafka.version>0.10.2.1</kafka.version>
+        <kafka.version>1.0.0</kafka.version>
     </properties>
 </project>
