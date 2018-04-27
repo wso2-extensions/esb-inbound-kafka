@@ -72,6 +72,164 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         createKafkaProperties(properties);
     }
 
+    /**
+     * Subscribe the kafka consumer and consume the record.
+     */
+    private void consumeKafkaRecords() {
+
+        try {
+            ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
+            for (ConsumerRecord record : records) {
+                MessageContext msgCtx = createMessageContext();
+                msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
+                msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
+                msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
+                msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
+                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
+                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
+                msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
+                msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
+                msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+                injectMessage(record.value().toString(), contentType, msgCtx);
+            }
+        } catch (WakeupException ex) {
+            log.error("Error while wakeup the consumer" + consumer);
+            consumer.close();
+            consumer = null;
+        } catch (Exception ex) {
+            log.error("Error while consuming the message" + ex);
+        }
+    }
+
+    private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
+
+        AutoCloseInputStream in = new AutoCloseInputStream(new ByteArrayInputStream(strMessage.getBytes()));
+        return this.injectMessage(in, contentType, msgCtx);
+    }
+
+    private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
+
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug("Processed Custom inbound EP Message of Content-type : " + contentType + " for " + name);
+            }
+
+            org.apache.axis2.context.MessageContext axis2MsgCtx = ((Axis2MessageContext) msgCtx)
+                    .getAxis2MessageContext();
+            Object builder;
+            if (StringUtils.isEmpty(contentType)) {
+                log.warn("Unable to determine content type for message, setting to application/json for " + name);
+            }
+            int index = contentType.indexOf(';');
+            String type = index > 0 ? contentType.substring(0, index) : contentType;
+            builder = BuilderUtil.getBuilderFromSelector(type, axis2MsgCtx);
+            if (builder == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("No message builder found for type '" + type + "'. Falling back to SOAP. for" + name);
+                }
+                builder = new SOAPBuilder();
+            }
+
+            OMElement documentElement1 = ((Builder) builder).processDocument(in, contentType, axis2MsgCtx);
+            msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement1));
+            if (this.injectingSeq == null || "".equals(this.injectingSeq)) {
+                log.error("Sequence name not specified. Sequence : " + this.injectingSeq + " for " + name);
+                return false;
+            }
+
+            SequenceMediator seq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
+                    .getSequence(this.injectingSeq);
+            seq.setErrorHandler(this.onErrorSeq);
+            if (log.isDebugEnabled()) {
+                log.debug("injecting message to sequence : " + this.injectingSeq + " of " + name);
+            }
+            if (!this.synapseEnvironment.injectInbound(msgCtx, seq, this.sequential)) {
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("Error while processing the Kafka inbound endpoint Message and the message should be in the "
+                    + "format of " + contentType, e);
+        }
+        return true;
+    }
+
+    /**
+     * load essential property for Kafka inbound endpoint.
+     *
+     * @param properties The mandatory parameters of Kafka.
+     */
+    private void validateMandatoryParameters(Properties properties) {
+
+        if (log.isDebugEnabled()) {
+            log.debug("Starting to load the Kafka Mandatory parameters");
+        }
+
+        bootstrapServersName = properties.getProperty(KafkaConstants.BOOTSTRAP_SERVERS_NAME);
+        keyDeserializer = properties.getProperty(KafkaConstants.KEY_DESERIALIZER);
+        valueDeserializer = properties.getProperty(KafkaConstants.VALUE_DESERIALIZER);
+        groupId = properties.getProperty(KafkaConstants.GROUP_ID);
+        pollTimeout = properties.getProperty(KafkaConstants.POLL_TIMEOUT);
+        topic = properties.getProperty(KafkaConstants.TOPIC_NAMES);
+        contentType = properties.getProperty(KafkaConstants.CONTENT_TYPE);
+
+        if (StringUtils.isEmpty(bootstrapServersName) || StringUtils.isEmpty(keyDeserializer) || StringUtils
+                .isEmpty(valueDeserializer) || StringUtils.isEmpty(groupId) || StringUtils.isEmpty(pollTimeout)
+                || StringUtils.isEmpty(topic) || StringUtils.isEmpty(contentType)) {
+            throw new SynapseException(
+                    "Mandatory Parameters cannot be Empty, The mandatory parameters are bootstrap.servers, "
+                            + "key.deserializer, value.deserializer, group.id, poll.timeout, topic.names and contentType");
+        }
+    }
+
+    /**
+     * Create the message context.
+     */
+    private MessageContext createMessageContext() {
+
+        MessageContext msgCtx = this.synapseEnvironment.createMessageContext();
+        org.apache.axis2.context.MessageContext axis2MsgCtx = ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
+        axis2MsgCtx.setServerSide(true);
+        axis2MsgCtx.setMessageID(String.valueOf(UUID.randomUUID()));
+        return msgCtx;
+    }
+
+    @Override
+    public Object poll() {
+
+        if (consumer == null) {
+            try {
+                consumer = new KafkaConsumer<>(kafkaProperties);
+                String[] topicsArray = topic.split(",");
+                consumer.subscribe(Arrays.asList(topicsArray));
+            } catch (Exception e) {
+                throw new SynapseException("Failed to construct kafka consumer", e);
+            }
+        }
+        consumeKafkaRecords();
+        return null;
+    }
+
+    /**
+     * Close the connection to the Kafka.
+     */
+    public void destroy() {
+
+        try {
+            if (consumer != null) {
+                consumer.wakeup();
+                if (log.isDebugEnabled()) {
+                    log.debug("The Kafka consumer has been close ! for " + name);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error while shutdown the Kafka consumer " + name + " " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create kafka properties.
+     * @param properties The kafka properties.
+     */
     private void createKafkaProperties(Properties properties) {
 
         kafkaProperties = new Properties();
@@ -285,160 +443,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if (properties.getProperty(KafkaConstants.SSL_TRUSTMANAGER_ALGORITHM) != null) {
             kafkaProperties.put(KafkaConstants.SSL_TRUSTMANAGER_ALGORITHM,
                     properties.getProperty(KafkaConstants.SSL_TRUSTMANAGER_ALGORITHM));
-        }
-    }
-
-    /**
-     * Subscribe the kafka consumer and consume the record.
-     */
-    private void consumeKafkaRecords() {
-
-        String[] topicsArray = topic.split(",");
-        consumer.subscribe(Arrays.asList(topicsArray));
-        try {
-            ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
-            for (ConsumerRecord record : records) {
-                MessageContext msgCtx = createMessageContext();
-                msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
-                msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
-                msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
-                msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
-                msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-                msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
-                injectMessage(record.value().toString(), contentType, msgCtx);
-            }
-        } catch (WakeupException ex) {
-            log.error("Error while wakeup the consumer" + consumer);
-            consumer.close();
-            consumer = null;
-        } catch (Exception ex) {
-            log.error("Error while consuming the message" + ex);
-        }
-    }
-
-    private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
-
-        AutoCloseInputStream in = new AutoCloseInputStream(new ByteArrayInputStream(strMessage.getBytes()));
-        return this.injectMessage(in, contentType, msgCtx);
-    }
-
-    private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
-
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("Processed Custom inbound EP Message of Content-type : " + contentType + " for " + name);
-            }
-
-            org.apache.axis2.context.MessageContext axis2MsgCtx = ((Axis2MessageContext) msgCtx)
-                    .getAxis2MessageContext();
-            Object builder;
-            if (StringUtils.isEmpty(contentType)) {
-                log.warn("Unable to determine content type for message, setting to application/json for " + name);
-            }
-            int index = contentType.indexOf(';');
-            String type = index > 0 ? contentType.substring(0, index) : contentType;
-            builder = BuilderUtil.getBuilderFromSelector(type, axis2MsgCtx);
-            if (builder == null) {
-                if (log.isDebugEnabled()) {
-                    log.debug("No message builder found for type '" + type + "'. Falling back to SOAP. for" + name);
-                }
-                builder = new SOAPBuilder();
-            }
-
-            OMElement documentElement1 = ((Builder) builder).processDocument(in, contentType, axis2MsgCtx);
-            msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement1));
-            if (this.injectingSeq == null || "".equals(this.injectingSeq)) {
-                log.error("Sequence name not specified. Sequence : " + this.injectingSeq + " for " + name);
-                return false;
-            }
-
-            SequenceMediator seq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
-                    .getSequence(this.injectingSeq);
-            seq.setErrorHandler(this.onErrorSeq);
-            if (log.isDebugEnabled()) {
-                log.debug("injecting message to sequence : " + this.injectingSeq + " of " + name);
-            }
-            if (!this.synapseEnvironment.injectInbound(msgCtx, seq, this.sequential)) {
-                return false;
-            }
-        } catch (Exception e) {
-            log.error("Error while processing the Kafka inbound endpoint Message and the message should be in the "
-                    + "format of " + contentType, e);
-        }
-        return true;
-    }
-
-    /**
-     * load essential property for Kafka inbound endpoint.
-     *
-     * @param properties The mandatory parameters of Kafka.
-     */
-    private void validateMandatoryParameters(Properties properties) {
-
-        if (log.isDebugEnabled()) {
-            log.debug("Starting to load the Kafka Mandatory parameters");
-        }
-
-        bootstrapServersName = properties.getProperty(KafkaConstants.BOOTSTRAP_SERVERS_NAME);
-        keyDeserializer = properties.getProperty(KafkaConstants.KEY_DESERIALIZER);
-        valueDeserializer = properties.getProperty(KafkaConstants.VALUE_DESERIALIZER);
-        groupId = properties.getProperty(KafkaConstants.GROUP_ID);
-        pollTimeout = properties.getProperty(KafkaConstants.POLL_TIMEOUT);
-        topic = properties.getProperty(KafkaConstants.TOPIC_NAMES);
-        contentType = properties.getProperty(KafkaConstants.CONTENT_TYPE);
-
-        if (StringUtils.isEmpty(bootstrapServersName) || StringUtils.isEmpty(keyDeserializer) || StringUtils
-                .isEmpty(valueDeserializer) || StringUtils.isEmpty(groupId) || StringUtils.isEmpty(pollTimeout)
-                || StringUtils.isEmpty(topic) || StringUtils.isEmpty(contentType)) {
-            throw new SynapseException(
-                    "Mandatory Parameters cannot be Empty, The mandatory parameters are bootstrap.servers, "
-                            + "key.deserializer, value.deserializer, group.id, poll.timeout, topic.names and contentType");
-        }
-    }
-
-    /**
-     * Create the message context.
-     */
-    private MessageContext createMessageContext() {
-
-        MessageContext msgCtx = this.synapseEnvironment.createMessageContext();
-        org.apache.axis2.context.MessageContext axis2MsgCtx = ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
-        axis2MsgCtx.setServerSide(true);
-        axis2MsgCtx.setMessageID(String.valueOf(UUID.randomUUID()));
-        return msgCtx;
-    }
-
-    @Override
-    public Object poll() {
-
-        if (consumer == null) {
-            try {
-                consumer = new KafkaConsumer<>(kafkaProperties);
-            } catch (Exception e) {
-                throw new SynapseException("Failed to construct kafka consumer", e);
-            }
-        }
-        consumeKafkaRecords();
-        return null;
-    }
-
-    /**
-     * Close the connection to the Kafka.
-     */
-    public void destroy() {
-
-        try {
-            if (consumer != null) {
-                consumer.wakeup();
-                if (log.isDebugEnabled()) {
-                    log.debug("The Kafka consumer has been close ! for " + name);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Error while shutdown the Kafka consumer " + name + " " + e.getMessage(), e);
         }
     }
 }
