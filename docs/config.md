@@ -117,6 +117,7 @@ Given below are the descriptions of all possible parameters that you can set in 
 | ssl.truststore.location | The location of the truststore file | Required for security enabled configurations | String |
 | ssl.truststore.password | The password for the truststore file. **Note :** If you do not set a password, access to the truststore will still be available but integrity checking will be disabled | Required for security enabled configurations | Password |
 | security.protocol | The protocol used to communicate with brokers. Possible values are: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL | Required for security enabled configurations | SSL, PLAINTEXT |
+| max.poll.records | The maximum number of records returned in a single call to poll. | Required for throttling | Integer |
 
 For more information on Kafka configuration parameters, see the [Kafka Documentation](https://kafka.apache.org/documentation/#newconsumerconfigs).
 
