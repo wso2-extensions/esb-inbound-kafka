@@ -1,6 +1,6 @@
 # Configuring the Kafka Inbound Operation
 
-WSO2 ESB's Kafka inbound endpoint acts as a message consumer. It creates a connection to ZooKeeper and requests messages for either a topic, topics, or topic filters.
+The Kafka inbound endpoint of WSO2 ESB acts as a message consumer. It creates a connection to ZooKeeper and requests messages for either a topic/s or topic filters.
 
 To use the Kafka inbound endpoint, download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
 
@@ -8,6 +8,7 @@ To use the Kafka inbound endpoint, download and install [Apache Kafka](http://ka
 
 >>Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
 
+>>Download the Kafka inbound connector from [the WSO2 Store](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88) and copy it to <ESB_HOME>/repository/components/dropins.
 
 To configure the Kafka inbound endpoint, copy the following client libraries from <KAFKA_HOME>/lib to <ESB_HOME>/repository/components/lib.
                 
@@ -26,10 +27,9 @@ Run the following command to start the Kafka server:
 
     bin/kafka-server-start.sh config/server.properties
     
-    
 ## Sample configuration
 
-1. Given below is a sample Kafka configuration that can consume messages using a given topic or topics:
+1. Given below is a sample Kafka configuration that can consume messages using a given topic/s:
     >>Note: This configuration does not include security.
 
     #### Inbound Configuration without security
@@ -57,10 +57,10 @@ Run the following command to start the Kafka server:
     </inboundEndpoint>
     ```
     
-    You can add the above inbound configuration via the Management Console too:
+    You can add the above inbound configuration via the WSO2 ESB Management Console as well:
             ![alt text](images/inbound_config.png)
 
-2. Given below is a sample Kafka configuration that can consume messages using a given topic or topics :
+2. Given below is a sample Kafka configuration that can consume messages using a given topic/s :
     >>Note : This configuration includes security.
     
     #### Inbound configuration with security
@@ -94,9 +94,9 @@ Run the following command to start the Kafka server:
     </inboundEndpoint>
     ```
     
-    >> Note : Make sure that you provide the sequential and coordination parameters as shown in the above configuration.
+    >> Note: Make sure you provide the `sequential` and `coordination` parameters as shown in the above configuration.
     
-    You can add the above inbound configuration via the Management Console as well:
+    You can add the above inbound configuration via the WSO2 ESB Management Console as well:
     ![alt text](images/inbound_config_security.png)
     
 ### Kafka inbound endpoint parameters
@@ -123,7 +123,7 @@ For more information on Kafka configuration parameters, see the [Kafka Documenta
 
 ### Enabling security for Kafka producers and consumers
 
-For detailed information on how to enable TLS authentication for Kafka brokers, producers, and consumers, see [Enabling Security](enableSecurity.md).
+For information on how to enable TLS authentication for Kafka brokers, producers, and consumers, see [Enabling Security](enableSecurity.md).
 
 ### Working with Kafka clients/producers
 
@@ -131,21 +131,17 @@ Kafka versions 0.9.0.0 and above support TLS. Enabling security for Kafka produc
 
 ##### TLS
 
-The parameters you need to specify to support TLS is the same for both producers and consumers. It is required to specify the security protocol as well as the truststore and keystore information since you are using mutual authentication:
+The parameters required to support TLS is the same for both producers and consumers. As you are using mutual authentication, you should give the security protocol as well as the truststore and keystore information.
 
-Let's take a look at how to use a Kafka producer to start producing messages. First, either start the console producer or use the Kafka connector to produce the message. You can start the producer with or without security.
+Let's see how to use a Kafka producer to start producing messages. First, either start the console producer or use the Kafka connector to produce the message. You can start the producer with or without security.
 
-To start the console producer without security, execute the following command:
+To start the console producer without security, execute the following command. Alternatively, you can use the Kafka connector without security.
 
     bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
 
-Alternatively, you can use the Kafka connector without security.
-
-To start the console producer with security, execute the following command:
+To start the console producer with security, execute the following command. Alternatively, you can use the Kafka connector with security.
 
     kafka-console-producer –broker-list localhost:9092 –topic test –producer.config {file-path}/producer_ssl.properties
-
-Alternatively, you can use the Kafka connector with security.
 
 Use the following configuration to enable security for the console producer:
 
@@ -156,15 +152,13 @@ Use the following configuration to enable security for the console producer:
     ssl.keystore.password=test1234
     ssl.key.password=test1234
 
->>**Note :** If the passwords are stored in the client configuration, it is important to restrict access to the file via filesystem permission.
-
+>>**Note:** If the passwords are stored in the client configuration, it is important to restrict access to the file via filesystem permission.
 
 Send the following message using the console producer or the Kafka connector:
 
     {"test":"wso2"}
     {"test":"wso2"}
     {"test":"wso2"}
-    
     
 ### Configuring the sample scenario  
     
@@ -210,6 +204,6 @@ Create a sample fault sequence as follows:
 
 ### Testing the sample scenario
 
-The ESB debug log displays an INFO message as follows after produce a message using the console producer or the connector.
+After a message is produced using the console producer or the connector, the debug log of the ESB displays an INFO message as follows:
 
 ![alt text](images/output.png)
