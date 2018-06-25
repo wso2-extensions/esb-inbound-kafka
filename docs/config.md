@@ -210,7 +210,10 @@ After a message is produced using the console producer or the connector, the deb
 
 ### Configuring the sample scenario with Kafka record headers
 
-First, you need to pass Kafka record header with your Kafka message. This following sample assumes that the header name is [KAFKA_HEADER_NAME] and Kafka message topic is [KAFKA_TOPIC_NAME]
+First, you need to pass Kafka record header with your Kafka message.
+
+This following sample assumes that the header name is [KAFKA_HEADER_NAME] and Kafka message topic is [KAFKA_TOPIC_NAME]
+  
 Create a sample sequence as follows:
 
 ```xml
