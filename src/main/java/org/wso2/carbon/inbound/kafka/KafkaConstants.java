@@ -121,6 +121,4 @@ public class KafkaConstants {
     public static final String METRICS_SAMPLE_WINDOW_MS_DEFAULT = "30000";
     public static final String RECONNECT_BACKOFF_MS_DEFAULT = "50";
     public static final String RETRY_BACKOFF_MS_DEFAULT = "100";
-    public static final String METHOD_NAME = "publishMessages:";
-
 }
