@@ -79,22 +79,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * Subscribe the kafka consumer and consume the record.
      */
     private void consumeKafkaRecords() {
-
         try {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
             for (ConsumerRecord record : records) {
-                MessageContext msgCtx = createMessageContext();
-                msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
-                msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
-                msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
-                msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
-                msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-                msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
-                // Set the kafka headers to the message context
-                setDynamicParameters(msgCtx, topic, record.headers());
+                MessageContext msgCtx = setMessageContext(record);
                 injectMessage(record.value().toString(), contentType, msgCtx);
             }
         } catch (WakeupException ex) {
@@ -104,6 +92,29 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         } catch (Exception ex) {
             log.error("Error while consuming the message" + ex);
         }
+    }
+
+    /**
+     * Set the Kafka Records to a MessageContext
+     *
+     * @param record A Kafka record
+     * @return MessageContext A message context with the record header values
+     */
+    private MessageContext setMessageContext(ConsumerRecord record) {
+        MessageContext msgCtx = createMessageContext();
+        msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
+        msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
+        msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
+        //noinspection deprecation
+        msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
+        msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
+        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        // Set the kafka headers to the message context
+        setDynamicParameters(msgCtx, topic, record.headers());
+        return msgCtx;
     }
 
     /**
@@ -130,10 +141,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
     }
 
-    private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
+    private void injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
 
         AutoCloseInputStream in = new AutoCloseInputStream(new ByteArrayInputStream(strMessage.getBytes()));
-        return this.injectMessage(in, contentType, msgCtx);
+        this.injectMessage(in, contentType, msgCtx);
     }
 
     private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
