@@ -82,7 +82,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         try {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
             for (ConsumerRecord record : records) {
-                MessageContext msgCtx = setMessageContext(record);
+                MessageContext msgCtx = populateMessageContext(record);
                 injectMessage(record.value().toString(), contentType, msgCtx);
             }
         } catch (WakeupException ex) {
@@ -100,7 +100,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * @param record A Kafka record
      * @return MessageContext A message context with the record header values
      */
-    private MessageContext setMessageContext(ConsumerRecord record) {
+    private MessageContext populateMessageContext(ConsumerRecord record) {
         MessageContext msgCtx = createMessageContext();
         msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
         msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
