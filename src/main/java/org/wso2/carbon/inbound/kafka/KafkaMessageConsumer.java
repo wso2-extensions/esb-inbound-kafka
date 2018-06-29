@@ -141,10 +141,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
     }
 
-    private void injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
+    private boolean injectMessage(String strMessage, String contentType, MessageContext msgCtx) {
 
         AutoCloseInputStream in = new AutoCloseInputStream(new ByteArrayInputStream(strMessage.getBytes()));
-        this.injectMessage(in, contentType, msgCtx);
+        return this.injectMessage(in, contentType, msgCtx);
     }
 
     private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
