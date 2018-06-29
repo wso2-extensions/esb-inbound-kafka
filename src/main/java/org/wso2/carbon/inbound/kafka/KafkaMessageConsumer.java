@@ -30,6 +30,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.SynapseException;
 import org.apache.synapse.core.SynapseEnvironment;
@@ -39,6 +41,7 @@ import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
@@ -76,20 +79,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * Subscribe the kafka consumer and consume the record.
      */
     private void consumeKafkaRecords() {
-
         try {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
             for (ConsumerRecord record : records) {
-                MessageContext msgCtx = createMessageContext();
-                msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
-                msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
-                msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
-                msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
-                msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
-                msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-                msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+                MessageContext msgCtx = populateMessageContext(record);
                 injectMessage(record.value().toString(), contentType, msgCtx);
             }
         } catch (WakeupException ex) {
@@ -98,6 +91,53 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             consumer = null;
         } catch (Exception ex) {
             log.error("Error while consuming the message" + ex);
+        }
+    }
+
+    /**
+     * Set the Kafka Records to a MessageContext
+     *
+     * @param record A Kafka record
+     * @return MessageContext A message context with the record header values
+     */
+    private MessageContext populateMessageContext(ConsumerRecord record) {
+        MessageContext msgCtx = createMessageContext();
+        msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
+        msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
+        msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
+        //noinspection deprecation
+        msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
+        msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
+        msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
+        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        // Set the kafka headers to the message context
+        setDynamicParameters(msgCtx, topic, record.headers());
+        return msgCtx;
+    }
+
+    /**
+     * This will set the dynamic parameters to message context parameter from the kafka headers
+     *
+     * @param messageContext The message contest
+     * @param topicName      The topicName to generate the dynamic parameters
+     * @param headers        The headers of the kafka records
+     */
+    private void setDynamicParameters(MessageContext messageContext,
+                                      String topicName, Headers headers) {
+        String headerVal;
+        String headerKey;
+
+        for (Header header : headers) {
+            headerKey = header.key();
+            try {
+                headerVal = new String(header.value(), "UTF-8");
+                String key = topicName + "." + headerKey;
+                messageContext.setProperty(key, headerVal);
+            } catch (UnsupportedEncodingException e) {
+                log.error("Error while getting the kafka header value", e);
+            }
         }
     }
 
@@ -228,6 +268,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
     /**
      * Create kafka properties.
+     *
      * @param properties The kafka properties.
      */
     private void createKafkaProperties(Properties properties) {

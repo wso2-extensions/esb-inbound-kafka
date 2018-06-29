@@ -200,10 +200,41 @@ Create a sample fault sequence as follows:
    </log>
    <drop/>
 </sequence>
-```
+```  
 
 ### Testing the sample scenario
 
 After a message is produced using the console producer or the connector, the debug log of the ESB displays an INFO message as follows:
 
 ![alt text](images/output.png)
+
+### Configuring the sample scenario with Kafka record headers
+
+First, you need to pass Kafka record header with your Kafka message.
+The following sample assumes that the header name is [KAFKA_HEADER_NAME] and Kafka message topic is [KAFKA_TOPIC_NAME]
+  
+Create a sample sequence as follows:
+
+```xml
+<sequence xmlns="http://ws.apache.org/ns/synapse" name="request" onError="fault">
+   <log level="full"/>
+   <log level="custom">
+      <property xmlns:ns="http://org.apache.synapse/xsd"
+                name="Topic"
+                expression="get-property('topic')"/>
+   </log>
+   <log level="custom">
+      <property xmlns:ns="http://org.apache.synapse/xsd"
+                name="messageValue"
+                expression="get-property('messageValue')"/>
+   </log>
+   <log level="custom">
+      <property xmlns:ns="http://org.apache.synapse/xsd"
+                name="Content Type(Header Value)"
+                expression="get-property('[KAFKA_TOPIC_NAME].[KAFKA_HEADER_NAME]')"/>
+   </log>
+</sequence>
+```
+
+Now you can view the header as a log in the termial as follows.
+![alt text](images/output2.png)
