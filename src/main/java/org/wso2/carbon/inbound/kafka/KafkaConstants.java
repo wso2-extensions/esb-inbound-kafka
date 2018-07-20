@@ -34,6 +34,7 @@ public class KafkaConstants {
 
     //Mandatory parameter for Kafka Inbound Endpoint.
     public static final String TOPIC_NAMES = "topic.names";
+    public static final String TOPIC_PATTERN = "topic.pattern";
     public static final String CONTENT_TYPE = "contentType";
     public static final String BOOTSTRAP_SERVERS_NAME = "bootstrap.servers";
     public static final String KEY_DESERIALIZER = "key.deserializer";
