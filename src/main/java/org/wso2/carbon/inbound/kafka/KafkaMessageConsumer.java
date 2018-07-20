@@ -45,6 +45,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Kafka Polling Consumer.
@@ -65,6 +66,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String topic;
     private String contentType;
     private Properties kafkaProperties;
+    private boolean isRegexPattern = false;
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -209,7 +211,14 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         valueDeserializer = properties.getProperty(KafkaConstants.VALUE_DESERIALIZER);
         groupId = properties.getProperty(KafkaConstants.GROUP_ID);
         pollTimeout = properties.getProperty(KafkaConstants.POLL_TIMEOUT);
-        topic = properties.getProperty(KafkaConstants.TOPIC_NAMES);
+        // check whether the properties have topic names list or topic pattern
+        if (properties.getProperty(KafkaConstants.TOPIC_NAMES) != null) {
+            isRegexPattern = false;
+            topic = properties.getProperty(KafkaConstants.TOPIC_NAMES);
+        } else if (properties.getProperty(KafkaConstants.TOPIC_PATTERN) != null) {
+            isRegexPattern = true;
+            topic = properties.getProperty(KafkaConstants.TOPIC_PATTERN);
+        }
         contentType = properties.getProperty(KafkaConstants.CONTENT_TYPE);
 
         if (StringUtils.isEmpty(bootstrapServersName) || StringUtils.isEmpty(keyDeserializer) || StringUtils
@@ -217,7 +226,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 || StringUtils.isEmpty(topic) || StringUtils.isEmpty(contentType)) {
             throw new SynapseException(
                     "Mandatory Parameters cannot be Empty, The mandatory parameters are bootstrap.servers, "
-                            + "key.deserializer, value.deserializer, group.id, poll.timeout, topic.names and contentType");
+                            + "key.deserializer, value.deserializer, group.id, poll.timeout, "
+                            + "(topic.names or topic.pattern) and contentType");
         }
     }
 
@@ -239,8 +249,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if (consumer == null) {
             try {
                 consumer = new KafkaConsumer<>(kafkaProperties);
-                String[] topicsArray = topic.split(",");
-                consumer.subscribe(Arrays.asList(topicsArray));
+                if (!isRegexPattern) {
+                    String[] topicsArray = topic.split(",");
+                    consumer.subscribe(Arrays.asList(topicsArray));
+                } else {
+                    Pattern r = Pattern.compile(topic);
+                    consumer.subscribe(r);
+                }
             } catch (Exception e) {
                 throw new SynapseException("Failed to construct kafka consumer", e);
             }
