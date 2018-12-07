@@ -33,6 +33,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.synapse.MessageContext;
+import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
@@ -114,6 +115,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
         msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         // Set the kafka headers to the message context
         setDynamicParameters(msgCtx, topic, record.headers());
         return msgCtx;
