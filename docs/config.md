@@ -12,7 +12,7 @@ Follow the steps below to configure the Kafka inbound endpoint to work with the 
 
 - Go to [https://store.wso2.com/store/assets/esbconnector/details/kafka](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88), and click lick **Download Inbound Endpoint** to download the inbound JAR file and add the downloaded .jar file to the <EI_HOME>/dropins directory.
 
-- Copy the following client libraries from <KAFKA_HOME>/lib to <EI_HOME>/wso2/components/lib.
+- Copy the following client libraries from <KAFKA_HOME>/lib to <EI_HOME>/lib.
                 
 ** [kafka_2.12-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/1.0.0)  
 ** [kafka-clients-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/1.0.0)
