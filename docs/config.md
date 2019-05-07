@@ -2,22 +2,24 @@
 
 The Kafka inbound endpoint of WSO2 ESB acts as a message consumer. It creates a connection to ZooKeeper and requests messages for either a topic/s or topic filters.
 
-To use the Kafka inbound endpoint, download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
+Follow the steps below to configure the Kafka inbound endpoint to work with the ESB Profile of WSO2 EI:
+
+- Download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
 
 >>The recommended version of Kafka for the Kafka inbound endpoint is [kafka_2.12-1.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
 
->>Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
+- Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
 
->>Download the Kafka inbound connector from [the WSO2 Store](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88) and copy it to <ESB_HOME>/repository/components/dropins.
+- Go to [https://store.wso2.com/store/assets/esbconnector/details/kafka](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88), and click lick **Download Inbound Endpoint** to download the inbound JAR file and add the downloaded .jar file to the <EI_HOME>/dropins directory.
 
-To configure the Kafka inbound endpoint, copy the following client libraries from <KAFKA_HOME>/lib to <ESB_HOME>/repository/components/lib.
+- Copy the following client libraries from <KAFKA_HOME>/lib to <EI_HOME>/lib.
                 
-* [kafka_2.12-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/1.0.0)  
-* [kafka-clients-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/1.0.0)
-* [metrics-core-2.2.0.jar](https://mvnrepository.com/artifact/com.yammer.metrics/metrics-core/2.2.0)
-* [scala-library-2.12.3.jar](https://mvnrepository.com/artifact/org.scala-lang/scala-library/2.12.3)
-* [zkclient-0.10.jar](https://mvnrepository.com/artifact/com.101tec/zkclient/0.10)
-* [zookeeper-3.4.10.jar](https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper/3.4.10)
+** [kafka_2.12-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/1.0.0)  
+** [kafka-clients-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/1.0.0)
+** [metrics-core-2.2.0.jar](https://mvnrepository.com/artifact/com.yammer.metrics/metrics-core/2.2.0)
+** [scala-library-2.12.3.jar](https://mvnrepository.com/artifact/org.scala-lang/scala-library/2.12.3)
+** [zkclient-0.10.jar](https://mvnrepository.com/artifact/com.101tec/zkclient/0.10)
+** [zookeeper-3.4.10.jar](https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper/3.4.10)
 
 Run the following command to start the ZooKeeper server:
     
@@ -100,14 +102,6 @@ You can add the above inbound configuration via the WSO2 ESB Management Console 
     ```
     
     >> Note: Make sure you provide the `sequential` and `coordination` parameters as shown in the above configuration.
-    
-    You can add the above inbound configuration via the WSO2 ESB Management Console as well:
-    
-    * Click the Main tab on the Management Console and then go to Manage -> Service Bus and click Inbound Endpoints to open the Inbound Endpoints page.    
-    * On the Inbound Endpoints page, click Add Inbound Endpoint to open the New Inbound Endpoint page.
-    * Specify a name for the inbound endpoint, select the inbound protocol type as custom for the new inbound endpoint , and click Next.          
-                 ![alt text](images/inbound_config1.png) 
-                 ![alt text](images/inbound_config.png)
     
 ### Kafka inbound endpoint parameters
 
