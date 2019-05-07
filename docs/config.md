@@ -101,14 +101,6 @@ You can add the above inbound configuration via the WSO2 ESB Management Console 
     
     >> Note: Make sure you provide the `sequential` and `coordination` parameters as shown in the above configuration.
     
-    You can add the above inbound configuration via the WSO2 ESB Management Console as well:
-    
-    * Click the Main tab on the Management Console and then go to Manage -> Service Bus and click Inbound Endpoints to open the Inbound Endpoints page.    
-    * On the Inbound Endpoints page, click Add Inbound Endpoint to open the New Inbound Endpoint page.
-    * Specify a name for the inbound endpoint, select the inbound protocol type as custom for the new inbound endpoint , and click Next.          
-                 ![alt text](images/inbound_config1.png) 
-                 ![alt text](images/inbound_config.png)
-    
 ### Kafka inbound endpoint parameters
 
 Given below are the descriptions of all possible parameters that you can set in a Kafka configuration:
