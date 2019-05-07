@@ -2,15 +2,17 @@
 
 The Kafka inbound endpoint of WSO2 ESB acts as a message consumer. It creates a connection to ZooKeeper and requests messages for either a topic/s or topic filters.
 
-To use the Kafka inbound endpoint, download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
+Follow the steps below to configure the Kafka inbound endpoint to work with the ESB Profile of WSO2 EI:
+
+- Download and install [Apache Kafka](http://kafka.apache.org/downloads.html).
 
 >>The recommended version of Kafka for the Kafka inbound endpoint is [kafka_2.12-1.0.0](http://kafka.apache.org/downloads). For all available versions of Kafka, see [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
 
->>Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
+- Download the kafka_2.12-1.0.0.tgz from [here](https://www.apache.org/dyn/closer.cgi?path=/kafka/1.0.0/kafka_2.12-1.0.0.tgz) and extract it. Let's call this directory <KAFKA_HOME>.
 
->>Download the Kafka inbound connector from [the WSO2 Store](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88) and copy it to <ESB_HOME>/repository/components/dropins.
+- Go to [https://store.wso2.com/store/assets/esbconnector/details/kafka](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88), and click lick **Download Inbound Endpoint** to download the inbound JAR file and add the downloaded .jar file to the <EI_HOME>/dropins directory.
 
-To configure the Kafka inbound endpoint, copy the following client libraries from <KAFKA_HOME>/lib to <ESB_HOME>/repository/components/lib.
+- Copy the following client libraries from <KAFKA_HOME>/lib to <EI_HOME>/wso2/components/lib.
                 
 * [kafka_2.12-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka_2.12/1.0.0)  
 * [kafka-clients-1.0.0.jar](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients/1.0.0)
