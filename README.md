@@ -1,22 +1,34 @@
-# Kafka ESB Inbound
+# Kafka WSO2 EI Inbound Endpoint
 
-WSO2 ESB kafka inbound endpoint acts as a message consumer. It creates a connection to ZooKeeper and requests messages for a topic.
+
+WSO2 EI Kafka inbound endpoint acts as a message consumer. It creates a connection to ZooKeeper and requests messages for a topic.
+
+## Compatibility
+
+| Inbound Endpoint version | Supported Kafka version | Supported WSO2 ESB/EI version |
+| ------------- | ---------------|------------- |
+| [1.0.6](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.6) | 2.12-1.0.0 | EI 6.1.1, EI 6.4.0, EI 6.5.0    |
+| [1.0.5](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.5) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0     |
+| [1.0.4](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.4) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
+| [1.0.3](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.3) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
+| [1.0.2](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.2) | 2.12-1.0.0 | ESB 4.9.0    |
+| [1.0.1](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.1) | 2.12-1.0.0 | ESB 4.9.0    |
+| [1.0.0](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.0) | 2.12-1.0.0 | EI 6.1.1, ESB 4.9.0, ESB 5.0.0    |
 
 ## Getting started
 
 To get started with the inbound endpoint, go to [Configuring Kafka Inbound Endpoint](docs/config.md). Once you have completed your configurations, you can consume the messages that are produced by the kafka producer via a topic.   
 
-## Additional information
+## Building from the source
 
-To download the inbound JAR file, go to [https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88](https://store.wso2.com/store/assets/esbconnector/details/b15e9612-5144-4c97-a3f0-179ea583be88) and 
-click **Download Inbound Endpoint**. To use the inbound endpoint with ESB, copy the downloaded JAR file to the `<ESB_HOME>/repository/components/dropins` directory and restart your ESB server.
+Follow the steps given below to build the Kafka Inbound Endpoint from the source code.
 
-## Build
+1. Get a clone or download the source from [Github](https://github.com/wso2-extensions/esb-inbound-kafka).
+2. Run the following Maven command from the `esb-inbound-kafka` directory: `mvn clean install`.
+3. The JAR file for the Kafka Inbound Endpoint is created in the `esb-inbound-kafka/target` directory.
 
-mvn clean install
 
-### How You Can Contribute
+## How you can contribute
 
-You can create a third party connector and publish in WSO2 Store.
-
-https://docs.wso2.com/display/ESBCONNECTORS/Creating+and+Publishing+a+Third+Party+Connector
+As an open source project, WSO2 extensions welcome contributions from the community.
+Check the [issue tracker](https://github.com/wso2-extensions/esb-inbound-kafka/issues) for open issues that interest you. We look forward to receiving your contributions.
