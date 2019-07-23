@@ -29,6 +29,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
@@ -43,7 +45,11 @@ import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -68,6 +74,9 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String contentType;
     private Properties kafkaProperties;
     private boolean isRegexPattern = false;
+    private boolean isDisableAutoCommit;
+    private int failureRetryCount;
+    private int retryCounter = 0;
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -76,6 +85,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         super(properties, name, synapseEnvironment, scanInterval, injectingSeq, onErrorSeq, coordination, sequential);
         validateMandatoryParameters(properties);
         createKafkaProperties(properties);
+        checkDisableAutoCommit(properties);
     }
 
     /**
@@ -83,17 +93,73 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      */
     private void consumeKafkaRecords() {
         try {
-            ConsumerRecords<byte[], byte[]> records = consumer.poll(Long.parseLong(pollTimeout));
-            for (ConsumerRecord record : records) {
-                MessageContext msgCtx = populateMessageContext(record);
-                injectMessage(record.value().toString(), contentType, msgCtx);
-            }
+            ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.of(Long.parseLong(pollTimeout),
+                    ChronoUnit.MILLIS));
+            commitRecords(records);
         } catch (WakeupException ex) {
-            log.error("Error while wakeup the consumer" + consumer);
+            log.error("Error while wakeup the consumer " + consumer);
             consumer.close();
             consumer = null;
         } catch (Exception ex) {
-            log.error("Error while consuming the message" + ex);
+            log.error("Error while consuming the message " + ex);
+        }
+    }
+
+    /**
+     * The offset will manually commit per record if the auto-commit set to false.
+     * An error situation, if SET_ROLLBACK_ONLY set to true, the offset will set to
+     * the current record so the next polling always the same record.
+     *
+     * If failure.retry.count set, then the same record will not poll when the
+     * count exceeded.
+     *
+     * @param records ConsumerRecords
+     */
+    private void commitRecords(ConsumerRecords<byte[], byte[]> records) {
+        long recordOffset = 0;
+        TopicPartition topicPartition = null;
+        for (TopicPartition partition : records.partitions()) {
+            topicPartition = partition;
+            List<ConsumerRecord<byte[], byte[]>> partitionRecords = records.records(partition);
+            for (ConsumerRecord record : partitionRecords) {
+                recordOffset = record.offset();
+                MessageContext msgCtx = populateMessageContext(record);
+                boolean isConsumed = injectMessage(record.value().toString(), contentType, msgCtx);
+                // Manually commit if the record is consumed successfully and auto-commit
+                // set to false
+                if (isConsumed && isDisableAutoCommit) {
+                    consumer.commitSync(Collections.singletonMap(topicPartition,
+                            new OffsetAndMetadata(recordOffset + 1)));
+                // if SET_ROLLBACK_ONLY property set to true isConsumed will be false hence
+                // setting the offset to the current record. It ends up in a loop when an error
+                // scenario. For example, if a message always ends up hitting the fault sequence.
+                } else if (!isConsumed && isDisableAutoCommit) {
+                    consumer.seek(topicPartition, recordOffset);
+                    retryCounter = retryCounter + 1;
+                    break;
+                }
+            }
+        }
+        // Check failure retry count exceeded. If yes, set the offset to next record.
+        if (retryCounter == failureRetryCount && isDisableAutoCommit) {
+            log.warn("The offset set to the next record since failure retry count exceeded.");
+            consumer.seek(topicPartition, recordOffset + 1);
+            retryCounter = 0;
+        }
+    }
+
+    /**
+     * Check property enable.auto.commit=false and initialize
+     * other variable max retry and action after max retry
+     */
+    private void checkDisableAutoCommit(Properties properties) {
+        if ("false".equals(kafkaProperties.getProperty(KafkaConstants.ENABLE_AUTO_COMMIT))) {
+            isDisableAutoCommit = true;
+            if (properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT) != null) {
+                failureRetryCount = Integer.parseInt(properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT));
+            } else {
+                failureRetryCount = Integer.parseInt(KafkaConstants.FAILURE_RETRY_COUNT_DEFAULT);
+            }
         }
     }
 
@@ -152,7 +218,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     private boolean injectMessage(InputStream in, String contentType, MessageContext msgCtx) {
-
+        boolean isConsumed = true;
         try {
             if (log.isDebugEnabled()) {
                 log.debug("Processed Custom inbound EP Message of Content-type : " + contentType + " for " + name);
@@ -178,7 +244,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement1));
             if (this.injectingSeq == null || "".equals(this.injectingSeq)) {
                 log.error("Sequence name not specified. Sequence : " + this.injectingSeq + " for " + name);
-                return false;
+                isConsumed = false;
             }
 
             SequenceMediator seq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
@@ -188,13 +254,33 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 log.debug("injecting message to sequence : " + this.injectingSeq + " of " + name);
             }
             if (!this.synapseEnvironment.injectInbound(msgCtx, seq, this.sequential)) {
-                return false;
+                isConsumed = false;
+            }
+            if (isRollback(msgCtx)) {
+                isConsumed = false;
             }
         } catch (Exception e) {
             log.error("Error while processing the Kafka inbound endpoint Message and the message should be in the "
                     + "format of " + contentType, e);
+            isConsumed = false;
         }
-        return true;
+        return isConsumed;
+    }
+
+    /**
+     * Check the SET_ROLLBACK_ONLY property set to true
+     *
+     * @param msgCtx SynapseMessageContext
+     * @return true or false
+     */
+    private boolean isRollback(MessageContext msgCtx) {
+        // check rollback property from synapse context
+        Object rollbackProp = msgCtx.getProperty(KafkaConstants.SET_ROLLBACK_ONLY);
+        if (rollbackProp != null) {
+            return (rollbackProp instanceof Boolean && ((Boolean) rollbackProp))
+                    || (rollbackProp instanceof String && Boolean.valueOf((String) rollbackProp));
+        }
+        return false;
     }
 
     /**

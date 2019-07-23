@@ -93,6 +93,8 @@ public class KafkaConstants {
     public static final String SSL_KEYMANAGER_ALGORITHM = "ssl.keymanager.algorithm";
     public static final String SSL_SECURE_RANDOM_IMPLEMENTATION = "ssl.secure.random.implementation";
     public static final String SSL_TRUSTMANAGER_ALGORITHM = "ssl.trustmanager.algorithm";
+    public static final String SET_ROLLBACK_ONLY = "SET_ROLLBACK_ONLY";
+    public static final String FAILURE_RETRY_COUNT = "failure.retry.count";
 
     //Kafka Inbound endpoint parameter's default value.
     public static final String ENABLE_AUTO_COMMIT_DEFAULT = "true";
@@ -122,4 +124,6 @@ public class KafkaConstants {
     public static final String METRICS_SAMPLE_WINDOW_MS_DEFAULT = "30000";
     public static final String RECONNECT_BACKOFF_MS_DEFAULT = "50";
     public static final String RETRY_BACKOFF_MS_DEFAULT = "100";
+    public static final String FAILURE_RETRY_COUNT_DEFAULT = "-1";
+
 }
