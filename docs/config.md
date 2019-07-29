@@ -102,7 +102,45 @@ You can add the above inbound configuration via the WSO2 ESB Management Console 
     ```
     
     >> Note: Make sure you provide the `sequential` and `coordination` parameters as shown in the above configuration.
-    
+
+3. Given below is a sample Kafka configuration that can consume messages using a given topic/s :
+    >>Note : This configuration includes disable auto commit.
+
+    #### Inbound configuration with auto commit disabled
+
+    ```xml
+    <inboundEndpoint xmlns="http://ws.apache.org/ns/synapse"
+                     name="kafka"
+                     sequence="request"
+                     onError="fault"
+                     class="org.wso2.carbon.inbound.kafka.KafkaMessageConsumer"
+                     suspend="false">
+       <parameters>
+          <parameter name="interval">10</parameter>
+          <parameter name="coordination">true</parameter>
+          <parameter name="sequential">true</parameter>
+          <parameter name="inbound.behavior">polling</parameter>
+          <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
+          <parameter name="topic.names">test</parameter>
+          <parameter name="poll.timeout">100</parameter>
+          <parameter name="bootstrap.servers">localhost:9092</parameter>
+          <parameter name="group.id">hello</parameter>
+          <parameter name="contentType">application/json</parameter>
+          <parameter name="key.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
+          <parameter name="contentType">application/json</parameter>
+          <parameter name="enable.auto.commit">false</parameter>
+          <parameter name="failure.retry.count">5</parameter>
+       </parameters>
+    </inboundEndpoint>
+    ```
+
+    >> Note: The `<property name="SET_ROLLBACK_ONLY" value="true"/>` should set in the fault sequence to poll the 
+    same record if in a failure case. The internal logic does not commit if the above property set and the offset set 
+    to the current record. The `failure.retry.count` used to control the same record polling in a failure scenario. 
+    The offset set to next discarding the current record after exceeding the retry count. The default value is -1 means 
+    infinitely polling the same record in failure cases. The `<property name="SET_ROLLBACK_ONLY" value="true"/>` 
+    and `failure.retry.count` parameter only effective when `enable.auto.commit` set to false.
+
 ### Kafka inbound endpoint parameters
 
 Given below are the descriptions of all possible parameters that you can set in a Kafka configuration:
@@ -122,6 +160,8 @@ Given below are the descriptions of all possible parameters that you can set in 
 | ssl.truststore.password | The password for the truststore file. **Note :** If you do not set a password, access to the truststore will still be available but integrity checking will be disabled | Required for security enabled configurations | Password |
 | security.protocol | The protocol used to communicate with brokers. Possible values are: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL | Required for security enabled configurations | SSL, PLAINTEXT |
 | max.poll.records | The maximum number of records returned in a single call to poll. | Required for throttling | Integer |
+| enable.auto.commit | The default auto-commit is enabled. | Required for disable auto commit | true or false |
+| failure.retry.count | The offset set to the same record until the failure retry count exceeded. | The default value set to -1 | Positive Integer |
 
 For more information on Kafka configuration parameters, see the [Kafka Documentation](https://kafka.apache.org/documentation/#newconsumerconfigs).
 
