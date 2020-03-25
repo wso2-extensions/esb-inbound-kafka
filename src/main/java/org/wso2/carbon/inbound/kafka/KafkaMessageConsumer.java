@@ -47,6 +47,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -299,10 +300,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         valueDeserializer = properties.getProperty(KafkaConstants.VALUE_DESERIALIZER);
         groupId = properties.getProperty(KafkaConstants.GROUP_ID);
         pollTimeout = properties.getProperty(KafkaConstants.POLL_TIMEOUT);
-        // check whether the properties have topic names list or topic pattern
-        if (properties.getProperty(KafkaConstants.TOPIC_NAMES) != null) {
+        // check whether the properties have topic name or topic pattern
+        if (properties.getProperty(KafkaConstants.TOPIC_NAME) != null) {
             isRegexPattern = false;
-            topic = properties.getProperty(KafkaConstants.TOPIC_NAMES);
+            topic = properties.getProperty(KafkaConstants.TOPIC_NAME);
         } else if (properties.getProperty(KafkaConstants.TOPIC_PATTERN) != null) {
             isRegexPattern = true;
             topic = properties.getProperty(KafkaConstants.TOPIC_PATTERN);
@@ -315,7 +316,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             throw new SynapseException(
                     "Mandatory Parameters cannot be Empty, The mandatory parameters are bootstrap.servers, "
                             + "key.deserializer, value.deserializer, group.id, poll.timeout, "
-                            + "(topic.names or topic.pattern) and contentType");
+                            + "(topic.name or topic.pattern) and contentType");
         }
     }
 
@@ -338,8 +339,17 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             try {
                 consumer = new KafkaConsumer<>(kafkaProperties);
                 if (!isRegexPattern) {
-                    String[] topicsArray = topic.split(",");
-                    consumer.subscribe(Arrays.asList(topicsArray));
+                    if (properties.getProperty(KafkaConstants.TOPIC_PARTITIONS) != null) {
+                        String[] partitionsArray = properties.getProperty(KafkaConstants.TOPIC_PARTITIONS)
+                                .split(",");
+                        List<TopicPartition> topicPartitions = new ArrayList<>();
+                        for (String partition : partitionsArray) {
+                            topicPartitions.add(new TopicPartition(topic, Integer.parseInt(partition)));
+                        }
+                        consumer.assign(topicPartitions);
+                    } else {
+                        consumer.subscribe(Collections.singletonList(topic));
+                    }
                 } else {
                     Pattern r = Pattern.compile(topic);
                     consumer.subscribe(r);
