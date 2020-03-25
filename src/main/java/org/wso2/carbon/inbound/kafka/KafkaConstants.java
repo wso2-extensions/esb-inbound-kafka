@@ -33,7 +33,7 @@ public class KafkaConstants {
     public static final String KAFKA_KEY = "key";
 
     //Mandatory parameter for Kafka Inbound Endpoint.
-    public static final String TOPIC_NAMES = "topic.names";
+    public static final String TOPIC_NAME = "topic.name";
     public static final String TOPIC_PATTERN = "topic.pattern";
     public static final String CONTENT_TYPE = "contentType";
     public static final String BOOTSTRAP_SERVERS_NAME = "bootstrap.servers";
@@ -95,6 +95,7 @@ public class KafkaConstants {
     public static final String SSL_TRUSTMANAGER_ALGORITHM = "ssl.trustmanager.algorithm";
     public static final String SET_ROLLBACK_ONLY = "SET_ROLLBACK_ONLY";
     public static final String FAILURE_RETRY_COUNT = "failure.retry.count";
+    public static final String TOPIC_PARTITIONS = "topic.partitions";
 
     //Kafka Inbound endpoint parameter's default value.
     public static final String ENABLE_AUTO_COMMIT_DEFAULT = "true";

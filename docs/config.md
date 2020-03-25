@@ -49,7 +49,7 @@ Run the following command to start the Kafka server:
           <parameter name="coordination">true</parameter>
           <parameter name="inbound.behavior">polling</parameter>
           <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
-          <parameter name="topic.names">test</parameter>
+          <parameter name="topic.name">test</parameter>
           <parameter name="poll.timeout">100</parameter>
           <parameter name="bootstrap.servers">localhost:9092</parameter>
           <parameter name="group.id">hello</parameter>
@@ -85,7 +85,7 @@ You can add the above inbound configuration via the WSO2 ESB Management Console 
           <parameter name="sequential">true</parameter>
           <parameter name="inbound.behavior">polling</parameter>
           <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
-          <parameter name="topic.names">test</parameter>
+          <parameter name="topic.name">test</parameter>
           <parameter name="poll.timeout">100</parameter>
           <parameter name="bootstrap.servers">localhost:9092</parameter>
           <parameter name="group.id">hello</parameter>
@@ -121,7 +121,7 @@ You can add the above inbound configuration via the WSO2 ESB Management Console 
           <parameter name="sequential">true</parameter>
           <parameter name="inbound.behavior">polling</parameter>
           <parameter name="value.deserializer">org.apache.kafka.common.serialization.StringDeserializer</parameter>
-          <parameter name="topic.names">test</parameter>
+          <parameter name="topic.name">test</parameter>
           <parameter name="poll.timeout">100</parameter>
           <parameter name="bootstrap.servers">localhost:9092</parameter>
           <parameter name="group.id">hello</parameter>
@@ -150,7 +150,7 @@ Given below are the descriptions of all possible parameters that you can set in 
 | bootstrap.servers | A list of host or port pairs that you can use to establish the initial connection to the Kafka cluster | Yes | localhost:9092, localhost:9093 |
 | key.deserializer | The deserialiser class for the key that implements the Deserializer interface | Yes | class |
 | value.deserializer | The deserialiser class for the value that implements the Deserializer interface | Yes | class |
-| topic.names | A comma-separated list of topic names to consume the messages | Yes | String |
+| topic.name | Topic name to consume the messages from | Yes | String |
 | group.id | The unique string that identifies the consumer group that a consumer belongs to | Yes | String |
 | contentType | The message content type | Yes | application/json, application/xml, text/plain |
 | pollTimeout | The amount of time to block the consumer to consume messages | Yes | Long |
@@ -162,6 +162,7 @@ Given below are the descriptions of all possible parameters that you can set in 
 | max.poll.records | The maximum number of records returned in a single call to poll. | Required for throttling | Integer |
 | enable.auto.commit | The default auto-commit is enabled. | Required for disable auto commit | true or false |
 | failure.retry.count | The offset set to the same record until the failure retry count exceeded. | The default value set to -1 | Positive Integer |
+| topic.partitions | A comma separated list of partition numbers of the topic to consume from | Required for manual partition assignment | String |
 
 For more information on Kafka configuration parameters, see the [Kafka Documentation](https://kafka.apache.org/documentation/#newconsumerconfigs).
 
