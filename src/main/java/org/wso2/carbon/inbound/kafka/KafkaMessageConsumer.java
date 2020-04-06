@@ -184,7 +184,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         // Set the kafka headers to the message context
-        setDynamicParameters(msgCtx, topic, record.headers());
+        setDynamicParameters(msgCtx, record.headers());
         return msgCtx;
     }
 
@@ -192,20 +192,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * This will set the dynamic parameters to message context parameter from the kafka headers
      *
      * @param messageContext The message contest
-     * @param topicName      The topicName to generate the dynamic parameters
      * @param headers        The headers of the kafka records
      */
-    private void setDynamicParameters(MessageContext messageContext,
-                                      String topicName, Headers headers) {
-        String headerVal;
-        String headerKey;
-
+    private void setDynamicParameters(MessageContext messageContext, Headers headers) {
         for (Header header : headers) {
-            headerKey = header.key();
             try {
-                headerVal = new String(header.value(), "UTF-8");
-                String key = topicName + "." + headerKey;
-                messageContext.setProperty(key, headerVal);
+                String headerVal = new String(header.value(), "UTF-8");
+                messageContext.setProperty(header.key(), headerVal);
             } catch (UnsupportedEncodingException e) {
                 log.error("Error while getting the kafka header value", e);
             }
