@@ -241,8 +241,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 isConsumed = false;
             }
 
-            SequenceMediator seq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
-                    .getSequence(this.injectingSeq);
+            SequenceMediator seq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration().getSequence(
+                    this.injectingSeq);
+            if (seq == null) {
+                throw new SynapseException(
+                        "Sequence with name : " + this.injectingSeq + " is not found to mediate the message.");
+            }
             seq.setErrorHandler(this.onErrorSeq);
             if (log.isDebugEnabled()) {
                 log.debug("injecting message to sequence : " + this.injectingSeq + " of " + name);
