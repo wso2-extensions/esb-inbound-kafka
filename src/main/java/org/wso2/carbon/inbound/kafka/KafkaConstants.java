@@ -127,4 +127,11 @@ public class KafkaConstants {
     public static final String RETRY_BACKOFF_MS_DEFAULT = "100";
     public static final String FAILURE_RETRY_COUNT_DEFAULT = "-1";
 
+    // Avro properties
+    public static final String SCHEMA_REGISTRY_URL = "schema.registry.url";
+
+    public static final String DEFAULT_SCHEMA_REGISTRY_URL = "http://localhost:8081";
+
+    public static final String KAFKA_AVRO_DESERIALIZER = "io.confluent.kafka.serializers.KafkaAvroDeserializer";
+
 }

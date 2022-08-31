@@ -410,6 +410,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 .getProperty(KafkaConstants.MAX_PARTITION_FETCH_BYTES,
                         KafkaConstants.MAX_PARTITION_FETCH_BYTES_DEFAULT));
 
+        if(properties.getProperty(KafkaConstants.VALUE_DESERIALIZER).equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)){
+            kafkaProperties.put(KafkaConstants.SCHEMA_REGISTRY_URL, properties.
+                    getProperty(KafkaConstants.SCHEMA_REGISTRY_URL, KafkaConstants.DEFAULT_SCHEMA_REGISTRY_URL));
+        }
+
         if (properties.getProperty(KafkaConstants.SSL_KEY_PASSWORD) != null) {
             kafkaProperties
                     .put(KafkaConstants.SSL_KEY_PASSWORD, properties.getProperty(KafkaConstants.SSL_KEY_PASSWORD));
