@@ -125,7 +125,17 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             for (ConsumerRecord record : partitionRecords) {
                 recordOffset = record.offset();
                 MessageContext msgCtx = populateMessageContext(record);
-                boolean isConsumed = injectMessage(record.value().toString(), contentType, msgCtx);
+
+                // Fixes - CS0196510
+                Object value  = record.value();
+                boolean isConsumed = false;
+                if ( value == null ) {
+                    isConsumed = true;
+                    log.warn("A null record is passed and skipped");
+                } else {
+                    isConsumed = injectMessage(value.toString(), contentType, msgCtx);
+                }
+
                 // Manually commit if the record is consumed successfully and auto-commit
                 // set to false
                 if (isConsumed && isDisableAutoCommit) {
