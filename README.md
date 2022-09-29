@@ -5,19 +5,21 @@ WSO2 EI Kafka inbound endpoint acts as a message consumer. It creates a connecti
 
 ## Compatibility
 
-| Inbound Endpoint version | Supported Kafka version | Supported WSO2 ESB/EI version |
-| ------------- | ---------------|------------- |
+| Inbound Endpoint version                                                                                 | Supported Kafka version | Supported WSO2 ESB/EI version |
+|----------------------------------------------------------------------------------------------------------| ---------------|------------- |
+| [1.0.12](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.10) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
+| [1.0.11](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.10) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
 | [1.0.10](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.10) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
-| [1.0.9](https://github.com/wso2-extensions/esb-inbound-kafka/tree/v1.0.9) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
-| [1.0.8](https://github.com/wso2-extensions/esb-inbound-kafka/tree/v1.0.8) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
-| [1.0.7](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.7) | 2.12-2.2.1 | EI 6.1.1, EI 6.4.0, EI 6.5.0    |
-| [1.0.6](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.6) | 2.12-1.0.0 | EI 6.1.1, EI 6.4.0, EI 6.5.0    |
-| [1.0.5](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.5) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0     |
-| [1.0.4](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.4) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
-| [1.0.3](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.3) | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
-| [1.0.2](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.2) | 2.12-1.0.0 | ESB 4.9.0    |
-| [1.0.1](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.1) | 2.12-1.0.0 | ESB 4.9.0    |
-| [1.0.0](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.0) | 2.12-1.0.0 | EI 6.1.1, ESB 4.9.0, ESB 5.0.0    |
+| [1.0.9](https://github.com/wso2-extensions/esb-inbound-kafka/tree/v1.0.9)                                | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
+| [1.0.8](https://github.com/wso2-extensions/esb-inbound-kafka/tree/v1.0.8)                                | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
+| [1.0.7](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.7)   | 2.12-2.2.1 | EI 6.1.1, EI 6.4.0, EI 6.5.0    |
+| [1.0.6](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.6)   | 2.12-1.0.0 | EI 6.1.1, EI 6.4.0, EI 6.5.0    |
+| [1.0.5](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.5)   | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0     |
+| [1.0.4](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.4)   | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
+| [1.0.3](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.3)   | 2.12-1.0.0 | EI 6.2.0, ESB 4.9.0    |
+| [1.0.2](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.2)   | 2.12-1.0.0 | ESB 4.9.0    |
+| [1.0.1](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.1)   | 2.12-1.0.0 | ESB 4.9.0    |
+| [1.0.0](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.0)   | 2.12-1.0.0 | EI 6.1.1, ESB 4.9.0, ESB 5.0.0    |
 
 ## Getting started
 
