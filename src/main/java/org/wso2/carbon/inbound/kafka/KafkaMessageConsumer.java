@@ -186,7 +186,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
         msgCtx.setProperty(KafkaConstants.KAFKA_OFFSET, record.offset());
         //noinspection deprecation
-        msgCtx.setProperty(KafkaConstants.KAFKA_CHECKSUM, record.checksum());
+        // record.checksum() is deprecated, hence removed.
         msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP, record.timestamp());
         msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
