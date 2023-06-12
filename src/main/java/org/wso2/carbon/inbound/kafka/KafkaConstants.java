@@ -129,6 +129,8 @@ public class KafkaConstants {
 
     // Avro properties
     public static final String SCHEMA_REGISTRY_URL = "schema.registry.url";
+    public static final String SCHEMA_REGISTRY_BASIC_AUTH_CREDENTIALS_SOURCE = "basic.auth.credentials.source";
+    public static final String SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO = "basic.auth.user.info";
 
     public static final String DEFAULT_SCHEMA_REGISTRY_URL = "http://localhost:8081";
 

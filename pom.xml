@@ -22,7 +22,7 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.apache.synapse.inbound.kafka</groupId>
     <artifactId>org.apache.synapse.kafka.poll</artifactId>
-    <version>1.1.1-SNAPSHOT</version>
+    <version>1.1.1</version>
     <name>Kafka Polling Consumer</name>
     <url>http://wso2.org</url>
     <packaging>bundle</packaging>
@@ -31,6 +31,11 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
             <version>${kafka.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-avro-serializer</artifactId>
+            <version>${confluent.version}</version>
         </dependency>
         <!-- Carbon Mediation -->
         <dependency>
@@ -101,6 +106,16 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
                 <enabled>false</enabled>
             </releases>
         </repository>
+        <repository>
+            <id>confluent-releases</id>
+            <url>https://packages.confluent.io/maven/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
     </repositories>
     <scm>
         <connection>
@@ -156,5 +171,6 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
     <properties>
         <carbon.mediation.version>4.4.10</carbon.mediation.version>
         <kafka.version>3.3.1</kafka.version>
+        <confluent.version>7.4.0</confluent.version>
     </properties>
 </project>
