@@ -41,6 +41,7 @@ import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.mediators.base.SequenceMediator;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -423,6 +424,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if(properties.getProperty(KafkaConstants.VALUE_DESERIALIZER).equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)){
             kafkaProperties.put(KafkaConstants.SCHEMA_REGISTRY_URL, properties.
                     getProperty(KafkaConstants.SCHEMA_REGISTRY_URL, KafkaConstants.DEFAULT_SCHEMA_REGISTRY_URL));
+
+            if (properties.getProperty(KafkaConstants.SCHEMA_REGISTRY_BASIC_AUTH_CREDENTIALS_SOURCE) != null) {
+                kafkaProperties.put(KafkaAvroDeserializerConfig.BASIC_AUTH_CREDENTIALS_SOURCE,
+                        properties.getProperty(KafkaConstants.SCHEMA_REGISTRY_BASIC_AUTH_CREDENTIALS_SOURCE));
+            }
+
+            if (properties.getProperty(KafkaConstants.SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO) != null) {
+                kafkaProperties.put(KafkaAvroDeserializerConfig.USER_INFO_CONFIG,
+                        properties.getProperty(KafkaConstants.SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO));
+            }
         }
 
         if (properties.getProperty(KafkaConstants.SSL_KEY_PASSWORD) != null) {
