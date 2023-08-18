@@ -145,7 +145,7 @@ public class KafkaConstants {
             "org.wso2.carbon.inbound.kafka.deserializer.ErrorHandlingDeserializer";
 
     // Error codes
-    public static final String POISON_PILL_DETECTED = "700601";
-    public static final String MAX_RETRY_COUNT_EXCEEDED = "700602";
+    public static final String POISON_PILL_DETECTED = "700510";
+    public static final String RETRY_EXHAUSTED = "700511";
 
 }

@@ -137,9 +137,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 if ( value == null ) {
                     if (isPoisonPill(record)) {
                         poisonPillDetected = true;
-                        log.warn("A poison pill was detected and will be skipped. The respective error details"
-                                + " will be injected to the `onError` sequence: " + this.onErrorSeq
-                                + " of Kafka Inbound Endpoint: " + name);
+                        log.warn("A poison pill was detected for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset()
+                                + ". The respective error details will be injected to the `onError` sequence: "
+                                + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
                         handlePoisonPill(record, msgCtx);
                     } else {
                         log.warn("A null record is passed and skipped");
@@ -151,7 +153,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
                 if (isDisableAutoCommit) {
                     if (poisonPillDetected) {
-                        log.info("The poison pill is skipped by setting the offset to the next record.");
+                        log.info("The poison pill at offset " + record.offset()
+                                + " is skipped by setting the offset to the next record.");
                         consumer.seek(topicPartition, recordOffset + 1);
                         continue;
                     }

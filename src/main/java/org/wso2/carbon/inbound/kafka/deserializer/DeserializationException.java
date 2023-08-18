@@ -79,11 +79,11 @@ public class DeserializationException extends KafkaException {
     @Override
     public String getMessage() {
 
-        return "Error details{ message=" + super.getMessage()
+        return "Error details{message=" + super.getMessage()
                 + ", topic=" + this.topic
                 + ", data=" + Arrays.toString(this.data)
                 + ", cause=" + getCause().getMessage()
-                + " }";
+                + "}";
     }
 
 }

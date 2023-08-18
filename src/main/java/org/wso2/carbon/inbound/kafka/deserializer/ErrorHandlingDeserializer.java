@@ -69,7 +69,7 @@ public class ErrorHandlingDeserializer<T> implements Deserializer<T> {
         } catch (Exception e) {
             Iterable<Header> recordHeaders = null;
             Headers headers = new RecordHeaders(recordHeaders);
-            deserializationException(topic, headers, data, e, this.isForKey);
+            addDeserializationExceptionToHeaders(topic, headers, data, e, this.isForKey);
             return null;
         }
     }
@@ -86,7 +86,7 @@ public class ErrorHandlingDeserializer<T> implements Deserializer<T> {
             }
             return this.delegate.deserialize(topic, headers, data);
         } catch (Exception e) {
-            deserializationException(topic, headers, data, e, this.isForKey);
+            addDeserializationExceptionToHeaders(topic, headers, data, e, this.isForKey);
             return null;
         }
     }
@@ -129,8 +129,8 @@ public class ErrorHandlingDeserializer<T> implements Deserializer<T> {
      * @param ex the exception.
      * @param isForKeyArg true if this is a key deserialization problem, otherwise value.
      */
-    private static void deserializationException(String topic, Headers headers, byte[] data, Exception ex,
-                                                boolean isForKeyArg) {
+    private static void addDeserializationExceptionToHeaders(String topic, Headers headers, byte[] data,
+                                                             Exception ex, boolean isForKeyArg) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         DeserializationException exception =
                 new DeserializationException("Failed to deserialize the " + getType(isForKeyArg), topic, data,
@@ -147,8 +147,9 @@ public class ErrorHandlingDeserializer<T> implements Deserializer<T> {
                         + ". Original exception message: " + ex.getMessage()));
                 oos.writeObject(exception);
             } catch (IOException ex2) {
-                LOGGER.error("Poison pill is detected, but will be skipped as Could not serialize a "
-                        + "DeserializationException. " + ex2.getMessage());
+                LOGGER.error("Poison pill is detected for Topic: " + topic
+                        + ". However, unable to inject the error details to 'onError' sequence since"
+                        + " there was an error while serializing a DeserializationException. " + ex2.getMessage());
                 return;
             }
         }
