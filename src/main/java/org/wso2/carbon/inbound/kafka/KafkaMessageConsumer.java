@@ -123,6 +123,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private void commitRecords(ConsumerRecords<byte[], byte[]> records) {
         long recordOffset = 0;
         TopicPartition topicPartition = null;
+        ConsumerRecord failedRecord = null;
         for (TopicPartition partition : records.partitions()) {
             topicPartition = partition;
             List<ConsumerRecord<byte[], byte[]>> partitionRecords = records.records(partition);
@@ -167,6 +168,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     // setting the offset to the current record. It ends up in a loop when an error
                     // scenario. For example, if a message always ends up hitting the fault sequence.
                     } else {
+                        failedRecord = record;
                         consumer.seek(topicPartition, recordOffset);
                         retryCounter = retryCounter + 1;
                         break;
@@ -179,6 +181,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             log.warn("The offset set to the next record since failure retry count exceeded.");
             consumer.seek(topicPartition, recordOffset + 1);
             retryCounter = 0;
+            if (failedRecord != null) {
+                MessageContext msgCtx = populateMessageContext(failedRecord);
+                injectErrorMessage("Failed to successfully mediate the message to/in the sequence: "
+                        + this.injectingSeq + " of Kafka Inbound Endpoint: " + name + ", even after "
+                        + failureRetryCount + " retires.", KafkaConstants.RETRY_EXHAUSTED, msgCtx);
+            }
         }
     }
 
