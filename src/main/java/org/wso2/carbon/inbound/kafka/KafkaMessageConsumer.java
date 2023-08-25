@@ -30,6 +30,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
@@ -44,7 +45,9 @@ import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.UnsupportedEncodingException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -130,25 +133,44 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 // Fixes - CS0196510
                 Object value  = record.value();
                 boolean isConsumed = false;
+                boolean poisonPillDetected = false;
                 if ( value == null ) {
+                    if (isPoisonPill(record)) {
+                        poisonPillDetected = true;
+                        log.warn("A poison pill was detected for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset()
+                                + ". The respective error details will be injected to the `onError` sequence: "
+                                + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
+                        handlePoisonPill(record, msgCtx);
+                    } else {
+                        log.warn("A null record is passed and skipped");
+                    }
                     isConsumed = true;
-                    log.warn("A null record is passed and skipped");
                 } else {
                     isConsumed = injectMessage(value.toString(), contentType, msgCtx);
                 }
 
-                // Manually commit if the record is consumed successfully and auto-commit
-                // set to false
-                if (isConsumed && isDisableAutoCommit) {
-                    consumer.commitSync(Collections.singletonMap(topicPartition,
-                            new OffsetAndMetadata(recordOffset + 1)));
-                // if SET_ROLLBACK_ONLY property set to true isConsumed will be false hence
-                // setting the offset to the current record. It ends up in a loop when an error
-                // scenario. For example, if a message always ends up hitting the fault sequence.
-                } else if (!isConsumed && isDisableAutoCommit) {
-                    consumer.seek(topicPartition, recordOffset);
-                    retryCounter = retryCounter + 1;
-                    break;
+                if (isDisableAutoCommit) {
+                    if (poisonPillDetected) {
+                        log.info("The poison pill at offset " + record.offset()
+                                + " is skipped by setting the offset to the next record.");
+                        consumer.seek(topicPartition, recordOffset + 1);
+                        continue;
+                    }
+                    // Manually commit if the record is consumed successfully and auto-commit
+                    // set to false
+                    if (isConsumed) {
+                        consumer.commitSync(Collections.singletonMap(topicPartition,
+                                new OffsetAndMetadata(recordOffset + 1)));
+                    // if SET_ROLLBACK_ONLY property set to true isConsumed will be false hence
+                    // setting the offset to the current record. It ends up in a loop when an error
+                    // scenario. For example, if a message always ends up hitting the fault sequence.
+                    } else {
+                        consumer.seek(topicPartition, recordOffset);
+                        retryCounter = retryCounter + 1;
+                        break;
+                    }
                 }
             }
         }
@@ -157,6 +179,57 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             log.warn("The offset set to the next record since failure retry count exceeded.");
             consumer.seek(topicPartition, recordOffset + 1);
             retryCounter = 0;
+        }
+    }
+
+    /**
+     * A poison pill (in the context of Kafka) is a record that has been produced to a Kafka topic
+     * and always fails when consumed, no matter how many times it is attempted. At this level, a record
+     * is considered as a poison pill if the record headers contain either 'KafkaInboundKeyDeserializerException' or
+     * 'KafkaInboundValueDeserializerException' header in the record headers.
+     *
+     * @param record the consumer record
+     * @return true if the consumer record's headers contain either 'KafkaInboundKeyDeserializerException' or
+     * 'KafkaInboundValueDeserializerException' header.
+     */
+    private boolean isPoisonPill(ConsumerRecord record) {
+        return record.headers().lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER) != null
+                || record.headers().lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER) != null;
+
+    }
+
+    /**
+     * Extract the exception details from the deserialization exception headers and inject
+     * those details to error sequence.
+     *
+     * @param record ConsumerRecord instance
+     * @param msgCtx Synapse message context
+     */
+    private void handlePoisonPill(ConsumerRecord record, MessageContext msgCtx) {
+        Header keyDeserializationExceptionHeader = record.headers()
+                .lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER);
+        Header valueDeserializationExceptionHeader = record.headers()
+                .lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER);
+        byte [] value;
+        if (keyDeserializationExceptionHeader != null) {
+            value = keyDeserializationExceptionHeader.value();
+        } else {
+            value = valueDeserializationExceptionHeader.value();
+        }
+
+        try (ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(value))) {
+            // Read the KafkaException from the ObjectInputStream
+            KafkaException error = (KafkaException) objectInputStream.readObject();
+            injectErrorMessage(error.getMessage(), KafkaConstants.POISON_PILL_DETECTED, msgCtx);
+
+        } catch (ClassNotFoundException e) {
+            log.error("Could not deserialize the poison pill message into a 'KafkaException'. Hence, failed to"
+                    + " inject the poison pill error details to 'onError' sequence: " + this.onErrorSeq
+                    + " of Kafka Inbound Endpoint: " + name, e);
+        } catch (IOException e) {
+            log.error("Could not deserialize the KafkaException while handling the poison pill. Hence, failed to"
+                    + " inject the poison pill error details to 'onError' sequence: " + this.onErrorSeq
+                    + " of Kafka Inbound Endpoint: " + name, e);
         }
     }
 
@@ -277,6 +350,50 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Inject error message details as MessageContext properties to the 'onError' sequence that is configured
+     * in the Kafka Inbound Endpoint. The SET_ROLLBACK_ONLY property is ignored here as the fault sequence
+     * is purposefully and forcefully invoked.
+     *
+     * @param message error message to be set in the 'ERROR_MESSAGE' MessageContext property.
+     * @param msgCtx Synapse message context.
+     * @return false if the 'onError' sequence name is not configured in the Kafka Inbound Endpoint or
+     * if a sequence for the configured name is not found or if an error occurred while invoking the
+     * handlers in the Synapse Environment prior to mediate to the sequence. Otherwise, return true.
+     */
+    private boolean injectErrorMessage(String message, String errorCode, MessageContext msgCtx) {
+
+        if (StringUtils.isEmpty(this.onErrorSeq)) {
+            log.error("Could not mediate the error message as the 'onError' sequence name not specified for Kafka "
+                    + "Inbound Endpoint: " + name + ". Hence, no retry attempted on failure.");
+            return false;
+        }
+
+        SequenceMediator errorSeq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration().getSequence(
+                this.onErrorSeq);
+        if (errorSeq == null) {
+            log.error("Could not mediate the error message as the 'onError' Sequence with name: " + this.onErrorSeq
+                    + " not found. Hence, no retry attempted on failure.");
+            return false;
+        }
+
+        // Populate error details to the message context as properties
+        msgCtx.setProperty(SynapseConstants.ERROR_CODE, errorCode);
+        msgCtx.setProperty(SynapseConstants.ERROR_MESSAGE, message);
+
+        if (log.isDebugEnabled()) {
+            log.debug("injecting message to 'onError' sequence: " + this.onErrorSeq
+                    + " of Kafka Inbound Endpoint: " + name);
+        }
+        if (!this.synapseEnvironment.injectInbound(msgCtx, errorSeq, this.sequential)) {
+            log.warn("Could not inject the error details to 'onError' sequence: " + this.onErrorSeq
+                    + " of Kafka Inbound Endpoint: " + name);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Check the SET_ROLLBACK_ONLY property set to true
      *
      * @param msgCtx SynapseMessageContext
@@ -305,7 +422,19 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
         bootstrapServersName = properties.getProperty(KafkaConstants.BOOTSTRAP_SERVERS_NAME);
         keyDeserializer = properties.getProperty(KafkaConstants.KEY_DESERIALIZER);
+        if (KafkaConstants.DEFAULT_ERROR_HANDLING_DESERIALIZER_CLASS.equals(keyDeserializer)) {
+            if (StringUtils.isEmpty(properties.getProperty(KafkaConstants.KEY_DELEGATE_DESERIALIZER))) {
+                throw new SynapseException("The 'key.delegate.deserializer' property must not be empty when "
+                        + "'key.deserializer' is configured with the default error handling deserializer.");
+            }
+        }
         valueDeserializer = properties.getProperty(KafkaConstants.VALUE_DESERIALIZER);
+        if (KafkaConstants.DEFAULT_ERROR_HANDLING_DESERIALIZER_CLASS.equals(valueDeserializer)) {
+            if (StringUtils.isEmpty(properties.getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER))) {
+                throw new SynapseException("The 'value.delegate.deserializer' property must not be empty when "
+                        + "'value.deserializer' is configured with the default error handling deserializer.");
+            }
+        }
         groupId = properties.getProperty(KafkaConstants.GROUP_ID);
         pollTimeout = properties.getProperty(KafkaConstants.POLL_TIMEOUT);
         // check whether the properties have topic name or topic pattern
@@ -421,7 +550,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 .getProperty(KafkaConstants.MAX_PARTITION_FETCH_BYTES,
                         KafkaConstants.MAX_PARTITION_FETCH_BYTES_DEFAULT));
 
-        if(properties.getProperty(KafkaConstants.VALUE_DESERIALIZER).equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)){
+        kafkaProperties.put(KafkaConstants.KEY_DELEGATE_DESERIALIZER, properties
+                .getProperty(KafkaConstants.KEY_DELEGATE_DESERIALIZER));
+
+        kafkaProperties.put(KafkaConstants.VALUE_DELEGATE_DESERIALIZER, properties
+                .getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER));
+
+        if (properties.getProperty(KafkaConstants.VALUE_DESERIALIZER)
+                .equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)
+                || properties.getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER)
+                .equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)){
             kafkaProperties.put(KafkaConstants.SCHEMA_REGISTRY_URL, properties.
                     getProperty(KafkaConstants.SCHEMA_REGISTRY_URL, KafkaConstants.DEFAULT_SCHEMA_REGISTRY_URL));
 

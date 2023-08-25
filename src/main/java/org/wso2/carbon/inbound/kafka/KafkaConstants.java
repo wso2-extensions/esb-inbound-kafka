@@ -39,6 +39,8 @@ public class KafkaConstants {
     public static final String BOOTSTRAP_SERVERS_NAME = "bootstrap.servers";
     public static final String KEY_DESERIALIZER = "key.deserializer";
     public static final String VALUE_DESERIALIZER = "value.deserializer";
+    public static final String KEY_DELEGATE_DESERIALIZER = "key.delegate.deserializer";
+    public static final String VALUE_DELEGATE_DESERIALIZER = "value.delegate.deserializer";
     public static final String GROUP_ID = "group.id";
     public static final String POLL_TIMEOUT = "poll.timeout";
 
@@ -135,5 +137,15 @@ public class KafkaConstants {
     public static final String DEFAULT_SCHEMA_REGISTRY_URL = "http://localhost:8081";
 
     public static final String KAFKA_AVRO_DESERIALIZER = "io.confluent.kafka.serializers.KafkaAvroDeserializer";
+
+    // Error Handling Deserializer properties
+    public static final String KEY_DESERIALIZER_EXCEPTION_HEADER = "KafkaInboundKeyDeserializerException";
+    public static final String VALUE_DESERIALIZER_EXCEPTION_HEADER = "KafkaInboundValueDeserializerException";
+    public static final String DEFAULT_ERROR_HANDLING_DESERIALIZER_CLASS =
+            "org.wso2.carbon.inbound.kafka.deserializer.ErrorHandlingDeserializer";
+
+    // Error codes
+    public static final String POISON_PILL_DETECTED = "700510";
+    public static final String RETRY_EXHAUSTED = "700511";
 
 }
