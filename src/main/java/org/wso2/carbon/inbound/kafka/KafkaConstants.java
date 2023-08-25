@@ -97,6 +97,7 @@ public class KafkaConstants {
     public static final String SSL_TRUSTMANAGER_ALGORITHM = "ssl.trustmanager.algorithm";
     public static final String SET_ROLLBACK_ONLY = "SET_ROLLBACK_ONLY";
     public static final String FAILURE_RETRY_COUNT = "failure.retry.count";
+    public static final String FAILURE_RETRY_INTERVAL = "failure.retry.interval";
     public static final String TOPIC_PARTITIONS = "topic.partitions";
 
     //Kafka Inbound endpoint parameter's default value.

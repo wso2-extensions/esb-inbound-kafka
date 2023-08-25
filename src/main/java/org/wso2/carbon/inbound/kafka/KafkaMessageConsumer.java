@@ -82,6 +82,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private boolean isDisableAutoCommit;
     private int failureRetryCount;
     private int retryCounter = 0;
+    private long failureRetryInterval = -1;
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -145,11 +146,28 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                                 + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
                         handlePoisonPill(record, msgCtx);
                     } else {
-                        log.warn("A null record is passed and skipped");
+                        log.warn("A null record was passed and skipped for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset());
                     }
                     isConsumed = true;
                 } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Injecting the kafka message for inbound mediation. Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset()
+                                + ", Kafka_Timestamp: " + record.timestamp());
+                    }
                     isConsumed = injectMessage(value.toString(), contentType, msgCtx);
+                    if (!isConsumed) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Kafka message was not successfully consumed by the inbound mediation."
+                                    + " Topic: " + record.topic()
+                                    + ", Partition No: " + record.partition()
+                                    + ", Offset: " + record.offset()
+                                    + ", Kafka_Timestamp: " + record.timestamp());
+                        }
+                    }
                 }
 
                 if (isDisableAutoCommit) {
@@ -170,6 +188,18 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     } else {
                         failedRecord = record;
                         consumer.seek(topicPartition, recordOffset);
+                        if (failureRetryInterval > 0 && retryCounter < failureRetryCount) {
+                            try {
+                                if (log.isDebugEnabled()) {
+                                    log.debug("Failed Kafka message will be retried for "
+                                            + "inbound mediation after max(poll_interval, failure_retry_interval): "
+                                            + Long.max(failureRetryInterval, scanInterval) + "ms.");
+                                }
+                                Thread.sleep(this.failureRetryInterval);
+                            } catch (InterruptedException e) {
+                                log.error("The interval for retrying failures was interrupted while waiting.");
+                            }
+                        }
                         retryCounter = retryCounter + 1;
                         break;
                     }
@@ -249,9 +279,23 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if ("false".equals(kafkaProperties.getProperty(KafkaConstants.ENABLE_AUTO_COMMIT))) {
             isDisableAutoCommit = true;
             if (properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT) != null) {
-                failureRetryCount = Integer.parseInt(properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT));
+                try {
+                    failureRetryCount = Integer.parseInt(properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT));
+                } catch (NumberFormatException e) {
+                    log.error("Invalid input for '" + KafkaConstants.FAILURE_RETRY_COUNT
+                            + "'. The value should be a positive Integer");
+                }
             } else {
                 failureRetryCount = Integer.parseInt(KafkaConstants.FAILURE_RETRY_COUNT_DEFAULT);
+            }
+
+            if (properties.getProperty(KafkaConstants.FAILURE_RETRY_INTERVAL) != null) {
+                try {
+                    failureRetryInterval = Integer.parseInt(properties.getProperty(KafkaConstants.FAILURE_RETRY_INTERVAL));
+                } catch (NumberFormatException e) {
+                    log.error("Invalid input for '" + KafkaConstants.FAILURE_RETRY_INTERVAL
+                            + "'. The value should be a positive Integer");
+                }
             }
         }
     }
