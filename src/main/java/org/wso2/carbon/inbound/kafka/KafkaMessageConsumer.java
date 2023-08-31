@@ -83,6 +83,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private int failureRetryCount;
     private int retryCounter = 0;
     private long failureRetryInterval = -1;
+    private String kafkaHeaderPrefix = "";
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -91,7 +92,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         super(properties, name, synapseEnvironment, scanInterval, injectingSeq, onErrorSeq, coordination, sequential);
         validateMandatoryParameters(properties);
         createKafkaProperties(properties);
-        checkDisableAutoCommit(properties);
+        populateOtherProperties(properties);
     }
 
     /**
@@ -272,6 +273,18 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Populate properties that are related to the functionality of Kafka Inbound Endpoint feature.
+     *
+     * @param properties properties configured in the Kafka Inbound Endpoint
+     */
+    private void populateOtherProperties(Properties properties) {
+        checkDisableAutoCommit(properties);
+        if (properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX) != null) {
+            kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
+        }
+    }
+
+    /**
      * Check property enable.auto.commit=false and initialize
      * other variable max retry and action after max retry
      */
@@ -334,7 +347,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         for (Header header : headers) {
             try {
                 String headerVal = new String(header.value(), "UTF-8");
-                messageContext.setProperty(header.key(), headerVal);
+                messageContext.setProperty(kafkaHeaderPrefix + header.key(), headerVal);
             } catch (UnsupportedEncodingException e) {
                 log.error("Error while getting the kafka header value", e);
             }
