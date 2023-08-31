@@ -824,5 +824,40 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             kafkaProperties.put(KafkaConstants.SSL_TRUSTMANAGER_ALGORITHM,
                     properties.getProperty(KafkaConstants.SSL_TRUSTMANAGER_ALGORITHM));
         }
+
+        if (properties.getProperty(KafkaConstants.SASL_OAUTHBEARER_TOKEN_ENDPOINT) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_OAUTHBEARER_TOKEN_ENDPOINT,
+                    properties.getProperty(KafkaConstants.SASL_OAUTHBEARER_TOKEN_ENDPOINT));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_OAUTHBEARER_SCOPE_CLAIM_NAME) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_OAUTHBEARER_SCOPE_CLAIM_NAME,
+                    properties.getProperty(KafkaConstants.SASL_OAUTHBEARER_SCOPE_CLAIM_NAME));
+        }
+
+        if (properties.getProperty(KafkaConstants.KAFKA_LOGIN_CALLBACK_HANDLER_CLASS) != null) {
+            kafkaProperties.put(KafkaConstants.KAFKA_LOGIN_CALLBACK_HANDLER_CLASS,
+                    properties.getProperty(KafkaConstants.KAFKA_LOGIN_CALLBACK_HANDLER_CLASS));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_LOGIN_CONNECT_TIMEOUT) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_LOGIN_CONNECT_TIMEOUT,
+                    properties.getProperty(KafkaConstants.SASL_LOGIN_CONNECT_TIMEOUT));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_LOGIN_READ_TIMEOUT) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_LOGIN_READ_TIMEOUT,
+                    properties.getProperty(KafkaConstants.SASL_LOGIN_READ_TIMEOUT));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF,
+                    properties.getProperty(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF_MAX) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF_MAX,
+                    properties.getProperty(KafkaConstants.SASL_LOGIN_RETRY_BACKOFF_MAX));
+        }
     }
 }

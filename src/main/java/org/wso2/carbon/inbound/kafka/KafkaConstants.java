@@ -100,6 +100,13 @@ public class KafkaConstants {
     public static final String FAILURE_RETRY_COUNT = "failure.retry.count";
     public static final String FAILURE_RETRY_INTERVAL = "failure.retry.interval";
     public static final String TOPIC_PARTITIONS = "topic.partitions";
+    public static final String SASL_OAUTHBEARER_TOKEN_ENDPOINT = "sasl.oauthbearer.token.endpoint.url";
+    public static final String SASL_OAUTHBEARER_SCOPE_CLAIM_NAME = "sasl.oauthbearer.scope.claim.name";
+    public static final String SASL_LOGIN_CONNECT_TIMEOUT = "sasl.login.connect.timeout.ms";
+    public static final String SASL_LOGIN_READ_TIMEOUT = "sasl.login.read.timeout.ms";
+    public static final String SASL_LOGIN_RETRY_BACKOFF = "sasl.login.retry.backoff.ms";
+    public static final String SASL_LOGIN_RETRY_BACKOFF_MAX = "sasl.login.retry.backoff.max.ms";
+    public static final String KAFKA_LOGIN_CALLBACK_HANDLER_CLASS = "sasl.login.callback.handler.class";
 
     //Kafka Inbound endpoint parameter's default value.
     public static final String ENABLE_AUTO_COMMIT_DEFAULT = "true";
