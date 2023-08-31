@@ -47,6 +47,7 @@ public class KafkaConstants {
     //Optional parameters for Kafka Inbound Endpoint.
     public static final String ENABLE_AUTO_COMMIT = "enable.auto.commit";
     public static final String AUTO_COMMIT_INTERVAL_MS = "auto.commit.interval.ms";
+    public static final String KAFKA_HEADER_PREFIX = "kafka.header.prefix";
     public static final String SESSION_TIMEOUT_MS = "session.timeout.ms";
     public static final String FETCH_MIN_BYTES = "fetch.min.bytes";
     public static final String HEARTBEAT_INTERVAL_MS = "heartbeat.interval.ms";
