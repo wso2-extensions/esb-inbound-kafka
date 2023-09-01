@@ -7,6 +7,7 @@ WSO2 EI Kafka inbound endpoint acts as a message consumer. It creates a connecti
 
 | Inbound Endpoint version                                                                                 | Supported Kafka version | Supported WSO2 ESB/EI version |
 |----------------------------------------------------------------------------------------------------------| ---------------|------------- |
+| [1.2.0](https://github.com/wso2-extensions/esb-inbound-kafka/releases/tag/v1.2.0) | 2.12-3.5.1| EI 6.6.0  , MI 1.2.0 , MI 4.x.x  |
 | [1.0.12](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.12) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
 | [1.0.11](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.11) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
 | [1.0.10](https://github.com/wso2-extensions/esb-inbound-kafka/tree/org.apache.synapse.kafka.poll-1.0.10) | 2.12-2.2.1| EI 6.1.1, EI 6.4.0, EI 6.5.0  , MI 1.1.0  |
@@ -23,7 +24,7 @@ WSO2 EI Kafka inbound endpoint acts as a message consumer. It creates a connecti
 
 ## Getting started
 
-To get started with the inbound endpoint, go to [Configuring Kafka Inbound Endpoint](docs/config.md). Once you have completed your configurations, you can consume the messages that are produced by the kafka producer via a topic.   
+To get started with the inbound endpoint, go to [Configuring Kafka Inbound Endpoint](docs/config.md). Once you have completed your configurations, you can consume the messages that are produced by the Kafka producer via a topic.   
 
 ## Building from the source
 
