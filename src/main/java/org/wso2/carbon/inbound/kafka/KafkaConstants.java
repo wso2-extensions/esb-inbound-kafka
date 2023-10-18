@@ -67,6 +67,8 @@ public class KafkaConstants {
     public static final String RECEIVER_BUFFER_BYTES = "receive.buffer.bytes";
     public static final String REQUEST_TIMEOUT_MS = "request.timeout.ms";
     public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
+    public static final String SASL_CLIENT_CALLBACK_HANDLER_CLASS = "sasl.client.callback.handler.class";
+    public static final String SASL_LOGIN_CLASS = "sasl.login.class";
     public static final String SASL_KERBEROS_SERVICE_NAME = "sasl.kerberos.service.name";
     public static final String SASL_MECANISM = "sasl.mechanism";
     public static final String SECURITY_PROTOCOL = "security.protocol";

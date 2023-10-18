@@ -617,16 +617,20 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 .getProperty(KafkaConstants.MAX_PARTITION_FETCH_BYTES,
                         KafkaConstants.MAX_PARTITION_FETCH_BYTES_DEFAULT));
 
-        kafkaProperties.put(KafkaConstants.KEY_DELEGATE_DESERIALIZER, properties
-                .getProperty(KafkaConstants.KEY_DELEGATE_DESERIALIZER));
+        if (properties.getProperty(KafkaConstants.KEY_DELEGATE_DESERIALIZER) != null) {
+            kafkaProperties.put(KafkaConstants.KEY_DELEGATE_DESERIALIZER, properties
+                    .getProperty(KafkaConstants.KEY_DELEGATE_DESERIALIZER));
+        }
 
-        kafkaProperties.put(KafkaConstants.VALUE_DELEGATE_DESERIALIZER, properties
-                .getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER));
+        if (properties.getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER) != null) {
+            kafkaProperties.put(KafkaConstants.VALUE_DELEGATE_DESERIALIZER, properties
+                    .getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER));
+        }
 
         if (properties.getProperty(KafkaConstants.VALUE_DESERIALIZER)
                 .equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)
-                || properties.getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER)
-                .equalsIgnoreCase(KafkaConstants.KAFKA_AVRO_DESERIALIZER)){
+                || KafkaConstants.KAFKA_AVRO_DESERIALIZER
+                .equalsIgnoreCase(properties.getProperty(KafkaConstants.VALUE_DELEGATE_DESERIALIZER))){
             kafkaProperties.put(KafkaConstants.SCHEMA_REGISTRY_URL, properties.
                     getProperty(KafkaConstants.SCHEMA_REGISTRY_URL, KafkaConstants.DEFAULT_SCHEMA_REGISTRY_URL));
 
@@ -699,6 +703,15 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if (properties.getProperty(KafkaConstants.SASL_JAAS_CONFIG) != null) {
             kafkaProperties
                     .put(KafkaConstants.SASL_JAAS_CONFIG, properties.getProperty(KafkaConstants.SASL_JAAS_CONFIG));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_CLIENT_CALLBACK_HANDLER_CLASS) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_CLIENT_CALLBACK_HANDLER_CLASS,
+                    properties.getProperty(KafkaConstants.SASL_CLIENT_CALLBACK_HANDLER_CLASS));
+        }
+
+        if (properties.getProperty(KafkaConstants.SASL_LOGIN_CLASS) != null) {
+            kafkaProperties.put(KafkaConstants.SASL_LOGIN_CLASS, properties.getProperty(KafkaConstants.SASL_LOGIN_CLASS));
         }
 
         if (properties.getProperty(KafkaConstants.SASL_KERBEROS_SERVICE_NAME) != null) {
