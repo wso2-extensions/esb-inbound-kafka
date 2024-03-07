@@ -139,11 +139,13 @@ public class KafkaConstants {
     public static final String RECONNECT_BACKOFF_MS_DEFAULT = "50";
     public static final String RETRY_BACKOFF_MS_DEFAULT = "100";
     public static final String FAILURE_RETRY_COUNT_DEFAULT = "-1";
+    public static final String AVRO_USE_LOGICAL_TYPE_CONVERTERS = "avro.use.logical.type.converters";
 
     // Avro properties
     public static final String SCHEMA_REGISTRY_URL = "schema.registry.url";
     public static final String SCHEMA_REGISTRY_BASIC_AUTH_CREDENTIALS_SOURCE = "basic.auth.credentials.source";
     public static final String SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO = "basic.auth.user.info";
+    public static final String AVRO_USE_LOGICAL_TYPE_CONVERTERS_DEFAULT = "false";
 
     public static final String DEFAULT_SCHEMA_REGISTRY_URL = "http://localhost:8081";
 

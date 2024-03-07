@@ -790,6 +790,9 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         kafkaProperties.put(KafkaConstants.RETRY_BACKOFF_MS,
                 properties.getProperty(KafkaConstants.RETRY_BACKOFF_MS, KafkaConstants.RETRY_BACKOFF_MS_DEFAULT));
 
+        kafkaProperties.put(KafkaConstants.AVRO_USE_LOGICAL_TYPE_CONVERTERS, properties
+                .getProperty(KafkaConstants.AVRO_USE_LOGICAL_TYPE_CONVERTERS, KafkaConstants.AVRO_USE_LOGICAL_TYPE_CONVERTERS_DEFAULT));
+
         if (properties.getProperty(KafkaConstants.SASL_KERBEROS_KINIT_CMD) != null) {
             kafkaProperties.put(KafkaConstants.SASL_KERBEROS_KINIT_CMD,
                     properties.getProperty(KafkaConstants.SASL_KERBEROS_KINIT_CMD));
