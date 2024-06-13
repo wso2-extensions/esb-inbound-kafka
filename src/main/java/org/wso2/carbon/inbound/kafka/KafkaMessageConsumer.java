@@ -188,7 +188,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     // scenario. For example, if a message always ends up hitting the fault sequence.
                     } else {
                         failedRecord = record;
-                        if (failureRetryInterval > 0 && retryCounter < failureRetryCount) {
+                        if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
                             try {
                                 if (log.isDebugEnabled()) {
                                     log.debug("Failed Kafka message will be retried for "
@@ -201,7 +201,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                             }
                         }
                         retryCounter = retryCounter + 1;
-                        if (retryCounter < failureRetryCount) {
+                        if (retryCounter < failureRetryCount || failureRetryCount < 0) {
                             consumer.seek(topicPartition, recordOffset);
                         }
                         break;
