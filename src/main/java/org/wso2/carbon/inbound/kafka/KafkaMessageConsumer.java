@@ -201,7 +201,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                             }
                         }
                         if (failureRetryCount > 0) {
-                            retryCounter = retryCounter + 1;
+                            retryCounter++;
                         }
                         if (retryCounter < failureRetryCount || failureRetryCount < 0) {
                             consumer.seek(topicPartition, recordOffset);
