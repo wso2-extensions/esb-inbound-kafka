@@ -200,7 +200,9 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                                 log.error("The interval for retrying failures was interrupted while waiting.");
                             }
                         }
-                        retryCounter = retryCounter + 1;
+                        if (failureRetryCount > 0) {
+                            retryCounter = retryCounter + 1;
+                        }
                         if (retryCounter < failureRetryCount || failureRetryCount < 0) {
                             consumer.seek(topicPartition, recordOffset);
                         }
@@ -298,7 +300,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     failureRetryCount = Integer.parseInt(properties.getProperty(KafkaConstants.FAILURE_RETRY_COUNT));
                 } catch (NumberFormatException e) {
                     log.error("Invalid input for '" + KafkaConstants.FAILURE_RETRY_COUNT
-                            + "'. The value should be a positive Integer");
+                            + "'. The value should be a valid Integer");
                 }
             } else {
                 failureRetryCount = Integer.parseInt(KafkaConstants.FAILURE_RETRY_COUNT_DEFAULT);
