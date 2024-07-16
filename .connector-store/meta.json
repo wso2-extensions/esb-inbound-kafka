@@ -14,9 +14,7 @@
             "products": [
                 "EI 6.6.0",
                 "EI 7.1.0",
-                "MI 4.0.0",
-                "MI 4.1.0",
-                "MI 4.2.0"
+                "MI 4.x.x"
             ],
             "isHidden": false
         }
