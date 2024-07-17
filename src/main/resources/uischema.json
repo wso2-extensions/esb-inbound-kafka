@@ -1,0 +1,171 @@
+{
+  "name": "kafkaInbound",
+  "type": "inbound-connector",
+  "title": "Kafka Inbound Connector",
+  "help": "Configure the Kafka inbound connector for efficient and secure message consumption from a Kafka cluster.",
+  "elements": [
+    {
+      "type": "attribute",
+      "value": {
+        "name": "endpointName",
+        "displayName": "Endpoint Name",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Unique identifier for the Kafka inbound endpoint."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "bootstrapServers",
+        "displayName": "Bootstrap Servers",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Comma-separated list of host:port pairs of Kafka brokers."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "topicName",
+        "displayName": "Topic Name",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Name of the Kafka topic to subscribe to."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "groupId",
+        "displayName": "Consumer Group ID",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Consumer group ID to use when consuming messages."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "autoCommit",
+        "displayName": "Enable Auto Commit",
+        "inputType": "boolean",
+        "defaultValue": "true",
+        "required": "false",
+        "helpTip": "Automatically commit offsets at the specified interval."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "autoCommitIntervalMs",
+        "displayName": "Auto Commit Interval (ms)",
+        "inputType": "string",
+        "defaultValue": "5000",
+        "required": "false",
+        "helpTip": "The frequency in milliseconds to commit offsets for auto-commit functionality."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "sessionTimeoutMs",
+        "displayName": "Session Timeout (ms)",
+        "inputType": "string",
+        "defaultValue": "10000",
+        "required": "false",
+        "helpTip": "Timeout in milliseconds to detect failures; controls the maximum time before a consumer is considered dead."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "keyDeserializer",
+        "displayName": "Key Deserializer Class",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Deserializer class for message keys."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "valueDeserializer",
+        "displayName": "Value Deserializer Class",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "Deserializer class for message values."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "securityProtocol",
+        "displayName": "Security Protocol",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "Protocol used to communicate with brokers (e.g., PLAINTEXT, SSL, SASL_PLAINTEXT)."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "sslTruststoreLocation",
+        "displayName": "SSL Truststore Location",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "Location of the SSL truststore file."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "sslTruststorePassword",
+        "displayName": "SSL Truststore Password",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "Password for the SSL truststore."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "saslMechanism",
+        "displayName": "SASL Mechanism",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "SASL mechanism used for client authentication (e.g., GSSAPI, PLAIN)."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "pollTimeout",
+        "displayName": "Poll Timeout (ms)",
+        "inputType": "string",
+        "required": "true",
+        "helpTip": "The timeout in milliseconds when polling for consumer data."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "sslKeystoreLocation",
+        "displayName": "SSL Keystore Location",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "Location of the SSL keystore file."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+        "name": "sslKeystorePassword",
+        "displayName": "SSL Keystore Password",
+        "inputType": "string",
+        "required": "false",
+        "helpTip": "Password for the SSL keystore."
+      }
+    }
+  ]
+}
