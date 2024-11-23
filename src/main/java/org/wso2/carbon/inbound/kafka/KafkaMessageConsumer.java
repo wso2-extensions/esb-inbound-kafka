@@ -17,6 +17,7 @@
  */
 package org.wso2.carbon.inbound.kafka;
 
+import org.apache.avro.generic.GenericData;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.builder.Builder;
 import org.apache.axis2.builder.BuilderUtil;
@@ -334,6 +335,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
         msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
+        if (record.value() instanceof GenericData.Record) {
+            GenericData.Record val = (GenericData.Record)record.value();
+            msgCtx.setProperty("schemaName", val.getSchema().getFullName());
+        }
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         // Set the kafka headers to the message context
