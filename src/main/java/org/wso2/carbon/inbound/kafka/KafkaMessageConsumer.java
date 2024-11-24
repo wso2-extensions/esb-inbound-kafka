@@ -336,8 +336,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
         msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
         if (record.value() instanceof GenericData.Record) {
-            GenericData.Record val = (GenericData.Record)record.value();
-            msgCtx.setProperty("schemaName", val.getSchema().getFullName());
+            GenericData.Record val = (GenericData.Record) record.value();
+            msgCtx.setProperty(KafkaConstants.KAFKA_SCHEMA_NAME, val.getSchema().getFullName());
         }
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);

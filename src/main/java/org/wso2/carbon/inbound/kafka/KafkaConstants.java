@@ -31,6 +31,7 @@ public class KafkaConstants {
     public static final String KAFKA_TIMESTAMP = "timestamp";
     public static final String KAFKA_TIMESTAMP_TYPE = "timestampType";
     public static final String KAFKA_KEY = "key";
+    public static final String KAFKA_SCHEMA_NAME = "schemaName";
 
     //Mandatory parameter for Kafka Inbound Endpoint.
     public static final String TOPIC_NAME = "topic.name";
