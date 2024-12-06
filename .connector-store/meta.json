@@ -1,0 +1,26 @@
+{
+    "name": "Kafka (Inbound)",
+    "owner": "WSO2",
+    "category": "Developer Tools",
+    "documentationUrl": "https://mi.docs.wso2.com/en/latest/reference/connectors/kafka-connector/kafka-connector-overview/",
+    "description": "Kafka inbound endpoint acts as a message consumer for Kafka. It receives messages from configured topics of Kafka platform and inject them into the mediation flow.",
+    "status": "Active",
+    "labels": [
+        "integration",
+        "communication",
+        "inbound-endpoint"
+    ],
+    "releases": [
+        {
+            "tagName": "v1.2.3",
+            "products": [
+                "MI 1.2.0",
+                "MI 4.3.0",
+                "MI 4.2.0",
+                "MI 4.1.0",
+                "MI 4.0.0"
+            ],
+            "isHidden": false
+        }
+    ]
+}
