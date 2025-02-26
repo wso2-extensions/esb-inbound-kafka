@@ -20,9 +20,9 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.apache.synapse.inbound.kafka</groupId>
-    <artifactId>org.apache.synapse.kafka.poll</artifactId>
-    <version>1.2.4</version>
+    <groupId>org.wso2.integration.inbound</groupId>
+    <artifactId>mi-inbound-kafka</artifactId>
+    <version>1.2.5-SNAPSHOT</version>
     <name>Kafka Polling Consumer</name>
     <url>http://wso2.org</url>
     <packaging>bundle</packaging>
@@ -131,6 +131,14 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <configuration>
+                    <tagNameFormat>@{project.version}</tagNameFormat>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>2.0</version>
                 <configuration>
@@ -183,10 +191,15 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
     </build>
     <distributionManagement>
         <repository>
-            <id>wso2-maven2-repository</id>
-            <name>WSO2 Maven2 Repository</name>
-            <url>scp://dist.wso2.org/home/httpd/dist.wso2.org/maven2/</url>
+            <id>nexus-releases</id>
+            <name>WSO2 Release Distribution Repository</name>
+            <url>https://maven.wso2.org/nexus/service/local/staging/deploy/maven2/</url>
         </repository>
+        <snapshotRepository>
+            <id>wso2.snapshots</id>
+            <name>Apache Snapshot Repository</name>
+            <url>https://maven.wso2.org/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
     </distributionManagement>
     <properties>
         <carbon.mediation.version>4.4.10</carbon.mediation.version>

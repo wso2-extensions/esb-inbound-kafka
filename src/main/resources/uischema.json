@@ -1,9 +1,9 @@
 {
   "id": "org.wso2.carbon.inbound.kafka.KafkaMessageConsumer",
   "name": "kafkaInbound",
-  "type": "inbound-connector",
-  "title": "Kafka Inbound Connector",
-  "help": "Configure the Kafka inbound connector for efficient and secure message consumption from a Kafka cluster.",
+  "type": "event-integration",
+  "title": "Kafka",
+  "help": "Configure Kafka for efficient and secure message consumption from a Kafka cluster.",
   "elements": [
     {
       "type": "attributeGroup",
@@ -14,10 +14,10 @@
             "type": "attribute",
             "value": {
               "name": "name",
-              "displayName": "Inbound Endpoint Name",
+              "displayName": "Event Integration Name",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Unique identifier for the Kafka inbound endpoint."
+              "helpTip": "Unique identifier for the Kafka event integration."
             }
           },
           {
@@ -34,10 +34,22 @@
           {
             "type": "attribute",
             "value": {
+              "name": "generateSequences",
+              "displayName": "Automatically generate sequences",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "true"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "sequence",
               "displayName": "Injecting Sequence Name",
-              "inputType": "string",
+              "inputType": "keyOrExpression",
+              "keyType": "sequence",
               "required": "true",
+              "enableCondition": [{"generateSequences":false}],
               "helpTip": "Sequence to inject the Kafka message"
             }
           },
@@ -46,8 +58,10 @@
             "value": {
               "name": "onError",
               "displayName": "Error Sequence Name",
-              "inputType": "string",
+              "inputType": "keyOrExpression",
+              "keyType": "sequence",
               "required": "true",
+              "enableCondition": [{"generateSequences":false}],
               "helpTip": "Error sequence to invoke on fault"
             }
           },
