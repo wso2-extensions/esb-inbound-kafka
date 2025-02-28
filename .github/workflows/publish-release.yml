@@ -57,4 +57,4 @@ jobs:
             --repo="$GITHUB_REPOSITORY" \
             --title="${{ env.VERSION_TAG }}" \
             --generate-notes \
-            target/*.zip
+            target/*.zip target/*.jar
