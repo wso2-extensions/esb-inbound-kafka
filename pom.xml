@@ -168,6 +168,7 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
+                <version>5.1.8</version>     
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
