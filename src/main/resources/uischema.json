@@ -37,8 +37,7 @@
               "name": "generateSequences",
               "displayName": "Automatically generate sequences",
               "inputType": "checkbox",
-              "defaultValue": true,
-              "required": "true"
+              "defaultValue": true
             }
           },
           {
