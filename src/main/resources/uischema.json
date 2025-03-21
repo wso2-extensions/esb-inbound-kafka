@@ -91,7 +91,8 @@
               "displayName": "Polling interval",
               "inputType": "string",
               "required": "true",
-              "helpTip": "The polling interval for the Kafka inbound endpoint."
+              "helpTip": "The polling interval for the Kafka inbound endpoint in milliseconds.",
+              "defaultValue": "100"
             }
           },
           {
@@ -131,7 +132,8 @@
               "displayName": "Kafka Servers",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Comma-separated list of host:port pairs of Kafka brokers."
+              "helpTip": "Comma-separated list of host:port pairs of Kafka brokers.",
+              "defaultValue": "localhost:9092"
             }
           },
           {
@@ -151,7 +153,8 @@
               "displayName": "Consumer Group ID",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Consumer group ID to use when consuming messages."
+              "helpTip": "Consumer group ID to use when consuming messages.",
+              "defaultValue": "group1"
             }
           },
           {
@@ -161,7 +164,8 @@
               "displayName": "Content Type",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Consumer group ID to use when consuming messages."
+              "helpTip": "Consumer group ID to use when consuming messages.",
+              "defaultValue": "application/json"
             }
           },
           {
@@ -171,7 +175,8 @@
               "displayName": "Poll Timeout (ms)",
               "inputType": "string",
               "required": "true",
-              "helpTip": "The timeout in milliseconds when polling for consumer data."
+              "helpTip": "The timeout in milliseconds when polling for consumer data.",
+              "defaultValue": "1000"
             }
           }
         ]
@@ -189,7 +194,8 @@
               "displayName": "Key Deserializer",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Deserializer class for key that implements the org.apache.kafka.common.serialization.Deserializer interface."
+              "helpTip": "Deserializer class for key that implements the org.apache.kafka.common.serialization.Deserializer interface.",
+              "defaultValue": "org.apache.kafka.common.serialization.StringDeserializer"
             }
           },
           {
@@ -199,7 +205,8 @@
               "displayName": "Value Deserializer",
               "inputType": "string",
               "required": "true",
-              "helpTip": "Deserializer class for value that implements the org.apache.kafka.common.serialization.Deserializer interface."
+              "helpTip": "Deserializer class for value that implements the org.apache.kafka.common.serialization.Deserializer interface.",
+              "defaultValue": "org.apache.kafka.common.serialization.StringDeserializer"
             }
           },
           {
