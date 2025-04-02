@@ -17,6 +17,9 @@ dependencies:
   - groupId: "org.apache.avro"
     artifactId: "avro"
     version: "1.11.3"
+  - groupId: "org.wso2.integration.inbound"
+    artifactId: "mi-inbound-kafka"
+    version: "${kafka.inbound.version}"
 
 repositories:
   - id: "wso2-nexus"
