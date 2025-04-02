@@ -149,6 +149,9 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.3.0</version>
                 <configuration>
+                    <filters>
+                        <filter>${basedir}/src/main/assembly/filter.properties</filter>
+                    </filters>
                     <descriptors>
                         <descriptor>src/main/assembly/zip-assembly.xml</descriptor>
                     </descriptors>
