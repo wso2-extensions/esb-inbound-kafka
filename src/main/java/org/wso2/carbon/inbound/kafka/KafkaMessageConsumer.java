@@ -476,6 +476,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private boolean isRollback(MessageContext msgCtx) {
         // check rollback property from synapse context
         Object rollbackProp = msgCtx.getProperty(KafkaConstants.SET_ROLLBACK_ONLY);
+        if (rollbackProp == null) {
+            // check rollback property from operation context in axis2 message context
+            org.apache.axis2.context.MessageContext axis2MessageCtx =
+                    ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
+            rollbackProp = axis2MessageCtx.getOperationContext().getProperty(KafkaConstants.SET_ROLLBACK_ONLY);
+        }
+
         if (rollbackProp != null) {
             return (rollbackProp instanceof Boolean && ((Boolean) rollbackProp))
                     || (rollbackProp instanceof String && Boolean.valueOf((String) rollbackProp));
