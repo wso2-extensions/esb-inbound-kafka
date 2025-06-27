@@ -2,6 +2,15 @@ name: Publish Release
 
 on:
   workflow_dispatch:
+    inputs: 
+      update_preference:
+        description: 'Metadata update preference'
+        required: true
+        default: 'overwrite'
+        type: choice
+        options:
+          - overwrite
+          - add_new_entry
 
 jobs:
   Ubuntu:
@@ -14,16 +23,24 @@ jobs:
         with:
           token: ${{ secrets.WSO2_INTEGRATION_BOT_TOKEN }}
           fetch-depth: 0
+
       - name: Set up JDK 11
         uses: joschi/setup-jdk@v2
         with:
           distribution: 'adopt'
           java-version: 11
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
       - name: Extract project version
         run: |
           VERSION=$(grep -oPm1 "(?<=<version>)[^<]+" pom.xml | sed 's/-SNAPSHOT$//')
           VERSION_TAG="v$VERSION"
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+
       - name: Configure Maven settings file
         run: |
           mkdir -p ~/.m2
@@ -36,18 +53,22 @@ jobs:
                     </server>
                   </servers>
                 </settings>" > ~/.m2/settings.xml
+
       - name: Configure git credentials
         run: |
           git config --global user.name ${{ secrets.WSO2_INTEGRATION_BOT_USERNAME }}
           git config --global user.email ${{ secrets.WSO2_INTEGRATION_BOT_EMAIL }}
+
       - name: Build artifacts
         run: |
           mvn clean install
+
       - name: Deploy artifacts with Maven
         env:
           GITHUB_TOKEN: ${{ secrets.WSO2_INTEGRATION_BOT_TOKEN }}
         run: |
-          mvn --batch-mode release:prepare release:perform -Dtag=${{ env.VERSION_TAG }}
+          mvn --batch-mode release:prepare release:perform -Dtag=${{ env.VERSION_TAG }} -Darguments="-Dmaven.javadoc.skip=true"
+
       - name: Create Github Release with Assets
         env:
           GITHUB_TOKEN: ${{ secrets.WSO2_INTEGRATION_BOT_TOKEN }}
@@ -57,4 +78,245 @@ jobs:
             --repo="$GITHUB_REPOSITORY" \
             --title="${{ env.VERSION_TAG }}" \
             --generate-notes \
-            target/*.zip target/*.jar
+            target/*.zip
+
+      - name: Update meta.json
+        env:
+          VERSION_TAG: ${{ env.VERSION_TAG }}
+          UPDATE_PREFERENCE: ${{ github.event.inputs.update_preference }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+          import glob
+          import sys
+          import logging
+
+          # Configure logging
+          logging.basicConfig(
+              level=logging.INFO,
+              format='%(asctime)s - %(levelname)s - %(message)s',
+              datefmt='%Y-%m-%d %H:%M:%S'
+          )
+          logger = logging.getLogger('meta-json-updater')
+
+          def process_elements(elements, params):
+              """Process elements recursively to extract parameters"""
+              for element in elements:
+                  # Process direct attribute
+                  if element.get('type') == 'attribute' and 'value' in element:
+                      value = element['value']
+                      # Skip configRef parameter
+                      if value.get('name') == 'configRef':
+                          continue
+                      params.append({
+                          'name': value.get('name', ''),
+                          'type': value.get('inputType', ''),
+                          'required': value.get('required', '').lower() == 'true',
+                          'defaultValue': value.get('defaultValue', ''),
+                          'description': value.get('helpTip', '')
+                      })
+                  
+                  # Process attribute group
+                  elif element.get('type') == 'attributeGroup' and 'value' in element:
+                      # Process elements in the attribute group
+                      if 'elements' in element['value']:
+                          process_elements(element['value']['elements'], params)
+
+          def extract_operation_params(file_path):
+              """Extract parameters from operation files"""
+              try:
+                  with open(file_path, 'r') as f:
+                      data = json.load(f)
+                  
+                  # Skip if not an operation file
+                  if 'operationName' not in data:
+                      return None
+                  
+                  operation_name = data.get('operationName')
+                  operation_title = data.get('title', '')
+                  
+                  logger.info(f"Processing operation: {operation_name}")
+                  
+                  params = []
+                  
+                  # Process all elements recursively
+                  if 'elements' in data:
+                      process_elements(data['elements'], params)
+                  
+                  logger.info(f"Found {len(params)} parameters for operation {operation_name}")
+                  return {
+                      'operation': operation_name,
+                      'title': operation_title,
+                      'params': params
+                  }
+              except Exception as e:
+                  logger.error(f"Error processing operation file {file_path}: {e}")
+                  return None
+
+          def extract_connection_params(file_path):
+              """Extract parameters from connection files"""
+              try:
+                  with open(file_path, 'r') as f:
+                      data = json.load(f)
+                  
+                  # Skip if not a connection file
+                  if 'connectionName' not in data:
+                      return None
+                  
+                  connection_name = data.get('connectionName')
+                  connection_title = data.get('title', '')
+                  
+                  logger.info(f"Processing connection: {connection_name}")
+                  
+                  params = []
+                  
+                  # Process all elements recursively
+                  if 'elements' in data:
+                      process_elements(data['elements'], params)
+                  
+                  logger.info(f"Found {len(params)} parameters for connection {connection_name}")
+                  return {
+                      'connection': connection_name,
+                      'title': connection_title,
+                      'params': params
+                  }
+              except Exception as e:
+                  logger.error(f"Error processing connection file {file_path}: {e}")
+                  return None
+
+          def create_release_entry(version, products, operation_params, connection_params):
+              """Create a release entry with operations and connections"""
+              # Create base release entry
+              release_entry = {
+                  'tagName': version,
+                  'products': products
+              }
+              
+              # Add operations
+              if operation_params:
+                  release_entry['operations'] = []
+                  for op_data in operation_params:
+                      release_entry['operations'].append({
+                          'name': op_data['operation'],
+                          'description': op_data['title'],
+                          'params': op_data['params'],
+                          'isHidden': False
+                      })
+              
+              # Add connections
+              if connection_params:
+                  release_entry['connections'] = []
+                  for conn_data in connection_params:
+                      release_entry['connections'].append({
+                          'name': conn_data['connection'],
+                          'description': conn_data['title'],
+                          'params': conn_data['params']
+                      })
+                      
+              return release_entry
+
+          def update_meta_json():
+              """Main function to update meta.json with parameters"""
+              try:
+                  # Get version from GitHub release
+                  version = os.environ.get('VERSION_TAG', '')
+                  logger.info(f"Current version from release: {version}")
+                  
+                  # Get update preference
+                  update_preference = os.environ.get('UPDATE_PREFERENCE', 'overwrite')
+                  logger.info(f"Update preference: {update_preference}")
+                  
+                  # Process all uischema files
+                  uischema_files = glob.glob('src/main/resources/uischema/*.json')
+                  operation_params = []
+                  connection_params = []
+                  
+                  for file_path in uischema_files:
+                      logger.info(f"Processing file: {file_path}")
+                      op_data = extract_operation_params(file_path)
+                      conn_data = extract_connection_params(file_path)
+                      
+                      if op_data:
+                          operation_params.append(op_data)
+                      if conn_data:
+                          connection_params.append(conn_data)
+                  
+                  logger.info(f"Found {len(operation_params)} operations and {len(connection_params)} connections")
+                  
+                  # Read meta.json
+                  with open('.connector-store/meta.json', 'r') as f:
+                      meta_json = json.load(f)
+
+                  products = []
+                  if meta_json.get('releases') and len(meta_json['releases']) > 0:
+                      products = meta_json['releases'][0].get('products', ['MI 4.4.0'])
+                      logger.info(f"Copied products from latest release: {products}")
+                  else:
+                      products = ['MI 4.4.0']
+                      logger.info("No previous releases found, using default product: MI 4.4.0")
+                  
+                  # Create or update release entry
+                  release_entry = create_release_entry(version, products, operation_params, connection_params)
+                  
+                  # Update meta.json based on preference
+                  if update_preference == 'overwrite':
+                      logger.info(f"Overwrite preference selected. Replacing the latest version in meta.json...")
+                      if meta_json.get('releases'):
+                          # Replace the first entry
+                          meta_json['releases'][0] = release_entry
+                      else:
+                          # Create new releases array
+                          meta_json['releases'] = [release_entry]
+                  else:
+                      # Add a new entry
+                      logger.info(f"Adding a new entry for version {version} to meta.json...")
+                      if not meta_json.get('releases'):
+                          meta_json['releases'] = []
+                      meta_json['releases'].insert(0, release_entry)
+                  
+                  # Write back to meta.json
+                  with open('.connector-store/meta.json', 'w') as f:
+                      json.dump(meta_json, f, indent=4)
+                  
+                  logger.info("Successfully updated meta.json")
+                  return 0
+              except Exception as e:
+                  logger.error(f"Error updating meta.json: {e}", exc_info=True)
+                  return 1
+
+          # Execute the main function
+          sys.exit(update_meta_json())
+          EOF
+      
+      - name: Create a PR for updated meta.json
+        env:
+          GH_TOKEN: ${{ secrets.WSO2_INTEGRATION_BOT_TOKEN }}
+        run: |
+          
+          # Check if there are changes to commit
+          if git diff --quiet .connector-store/meta.json; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Get current branch name
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          
+          # Create a new branch for the PR
+          PR_BRANCH="meta-update-${{ env.VERSION_TAG }}"
+          git checkout -b $PR_BRANCH
+          
+          # Add and commit changes
+          git add .connector-store/meta.json
+          git commit -m "[Workflow] Update meta.json with operation and connection parameters for version $VERSION_TAG"
+          
+          # Push to the new branch
+          git push https://${{ github.actor }}:${{ secrets.WSO2_INTEGRATION_BOT_TOKEN }}@github.com/${{ github.repository }}.git $PR_BRANCH
+          
+          # Create PR using GitHub CLI
+          gh pr create \
+            --title "Update meta.json for ${{ env.VERSION_TAG }}" \
+            --body "This PR updates the meta.json file with operation and connection parameters for version ${{ env.VERSION_TAG }}. The configRef parameter has been excluded from the parameter list. The products array has been copied from the previous release." \
+            --base $CURRENT_BRANCH \
+            --head $PR_BRANCH
