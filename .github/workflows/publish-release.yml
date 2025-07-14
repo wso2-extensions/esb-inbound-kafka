@@ -123,20 +123,13 @@ jobs:
                       if 'elements' in element['value']:
                           process_elements(element['value']['elements'], params)
 
-          def extract_operation_params(file_path):
-              """Extract parameters from operation files"""
+          def extract_inbound_params(file_path):
+              """Extract parameters from inbound endpoint uischema file"""
               try:
                   with open(file_path, 'r') as f:
                       data = json.load(f)
                   
-                  # Skip if not an operation file
-                  if 'operationName' not in data:
-                      return None
-                  
-                  operation_name = data.get('operationName')
-                  operation_title = data.get('title', '')
-                  
-                  logger.info(f"Processing operation: {operation_name}")
+                  logger.info(f"Processing inbound endpoint uischema: {file_path}")
                   
                   params = []
                   
@@ -144,49 +137,15 @@ jobs:
                   if 'elements' in data:
                       process_elements(data['elements'], params)
                   
-                  logger.info(f"Found {len(params)} parameters for operation {operation_name}")
-                  return {
-                      'operation': operation_name,
-                      'title': operation_title,
-                      'params': params
-                  }
+                  logger.info(f"Found {len(params)} parameters for inbound endpoint")
+                  return params
               except Exception as e:
-                  logger.error(f"Error processing operation file {file_path}: {e}")
-                  return None
+                  logger.error(f"Error processing inbound uischema file {file_path}: {e}")
+                  return []
 
-          def extract_connection_params(file_path):
-              """Extract parameters from connection files"""
-              try:
-                  with open(file_path, 'r') as f:
-                      data = json.load(f)
-                  
-                  # Skip if not a connection file
-                  if 'connectionName' not in data:
-                      return None
-                  
-                  connection_name = data.get('connectionName')
-                  connection_title = data.get('title', '')
-                  
-                  logger.info(f"Processing connection: {connection_name}")
-                  
-                  params = []
-                  
-                  # Process all elements recursively
-                  if 'elements' in data:
-                      process_elements(data['elements'], params)
-                  
-                  logger.info(f"Found {len(params)} parameters for connection {connection_name}")
-                  return {
-                      'connection': connection_name,
-                      'title': connection_title,
-                      'params': params
-                  }
-              except Exception as e:
-                  logger.error(f"Error processing connection file {file_path}: {e}")
-                  return None
 
-          def create_release_entry(version, products, operation_params, connection_params):
-              """Create a release entry with operations and connections"""
+          def create_release_entry(version, products, operation_params):
+              """Create a release entry with operations for inbound endpoint"""
               # Create base release entry
               release_entry = {
                   'tagName': version,
@@ -204,15 +163,8 @@ jobs:
                           'isHidden': False
                       })
               
-              # Add connections
-              if connection_params:
-                  release_entry['connections'] = []
-                  for conn_data in connection_params:
-                      release_entry['connections'].append({
-                          'name': conn_data['connection'],
-                          'description': conn_data['title'],
-                          'params': conn_data['params']
-                      })
+              # Add empty connections array for inbound endpoints
+              release_entry['connections'] = []
                       
               return release_entry
 
@@ -227,22 +179,25 @@ jobs:
                   update_preference = os.environ.get('UPDATE_PREFERENCE', 'overwrite')
                   logger.info(f"Update preference: {update_preference}")
                   
-                  # Process all uischema files
-                  uischema_files = glob.glob('src/main/resources/uischema/*.json')
+                  # Process the single uischema file for inbound endpoint
+                  uischema_file = 'src/main/resources/uischema.json'
                   operation_params = []
-                  connection_params = []
                   
-                  for file_path in uischema_files:
-                      logger.info(f"Processing file: {file_path}")
-                      op_data = extract_operation_params(file_path)
-                      conn_data = extract_connection_params(file_path)
+                  if os.path.exists(uischema_file):
+                      logger.info(f"Processing inbound endpoint uischema file: {uischema_file}")
                       
-                      if op_data:
-                          operation_params.append(op_data)
-                      if conn_data:
-                          connection_params.append(conn_data)
+                      # Extract parameters for "init" operation
+                      params = extract_inbound_params(uischema_file)
+                      if params:
+                          operation_params.append({
+                              'operation': 'init',
+                              'title': 'Initialize Kafka Inbound Endpoint',
+                              'params': params
+                          })
+                  else:
+                      logger.warning(f"uischema.json not found at {uischema_file}")
                   
-                  logger.info(f"Found {len(operation_params)} operations and {len(connection_params)} connections")
+                  logger.info(f"Found {len(operation_params)} operations for inbound endpoint")
                   
                   # Read meta.json
                   with open('.connector-store/meta.json', 'r') as f:
@@ -257,7 +212,7 @@ jobs:
                       logger.info("No previous releases found, using default product: MI 4.4.0")
                   
                   # Create or update release entry
-                  release_entry = create_release_entry(version, products, operation_params, connection_params)
+                  release_entry = create_release_entry(version, products, operation_params)
                   
                   # Update meta.json based on preference
                   if update_preference == 'overwrite':
