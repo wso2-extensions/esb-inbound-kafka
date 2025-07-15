@@ -17,13 +17,622 @@
     ],
     "releases": [
         {
-            "tagName": "v2.0.2",
+            "tagName": "v2.0.3",
             "products": [
                 "MI 4.4.0"
             ],
-            "operations": [],
-            "connections": [],
-            "isHidden": false
+            "operations": [
+                {
+                    "name": "init",
+                    "description": "Initialize Kafka Inbound Endpoint",
+                    "params": [
+                        {
+                            "name": "name",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Unique identifier for the Kafka event integration."
+                        },
+                        {
+                            "name": "class",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "org.wso2.carbon.inbound.kafka.KafkaMessageConsumer",
+                            "description": ""
+                        },
+                        {
+                            "name": "generateSequences",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": true,
+                            "description": ""
+                        },
+                        {
+                            "name": "sequence",
+                            "type": "keyOrExpression",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Sequence to inject the Kafka message"
+                        },
+                        {
+                            "name": "onError",
+                            "type": "keyOrExpression",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Error sequence to invoke on fault"
+                        },
+                        {
+                            "name": "suspend",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": false,
+                            "description": "Suspend Inbound"
+                        },
+                        {
+                            "name": "interval",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "100",
+                            "description": "The polling interval for the Kafka inbound endpoint in milliseconds."
+                        },
+                        {
+                            "name": "sequential",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": true,
+                            "description": "The behaviour when executing the given sequence."
+                        },
+                        {
+                            "name": "coordination",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": true,
+                            "description": "In a clustered setup, this will run the inbound only in a single worker node."
+                        },
+                        {
+                            "name": "bootstrap.servers",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "localhost:9092",
+                            "description": "Comma-separated list of host:port pairs of Kafka brokers."
+                        },
+                        {
+                            "name": "topic.name",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Name of the Kafka topic to subscribe to."
+                        },
+                        {
+                            "name": "group.id",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "group1",
+                            "description": "Consumer group ID to use when consuming messages."
+                        },
+                        {
+                            "name": "contentType",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "application/json",
+                            "description": "Consumer group ID to use when consuming messages."
+                        },
+                        {
+                            "name": "poll.timeout",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "1000",
+                            "description": "The timeout in milliseconds when polling for consumer data."
+                        },
+                        {
+                            "name": "key.deserializer",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "org.apache.kafka.common.serialization.StringDeserializer",
+                            "description": "Deserializer class for key that implements the org.apache.kafka.common.serialization.Deserializer interface."
+                        },
+                        {
+                            "name": "value.deserializer",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "org.apache.kafka.common.serialization.StringDeserializer",
+                            "description": "Deserializer class for value that implements the org.apache.kafka.common.serialization.Deserializer interface."
+                        },
+                        {
+                            "name": "schema.registry.url",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Comma-separated list of URLs for Schema Registry instances that can be used to register or look up schemas."
+                        },
+                        {
+                            "name": "basic.auth.credentials.source",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Specify how to pick the credentials for the Basic authentication header."
+                        },
+                        {
+                            "name": "basic.auth.user.info",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Specify the user info for the Basic authentication in the form of {username}:{password}."
+                        },
+                        {
+                            "name": "avro.use.logical.type.converters",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": false,
+                            "description": "Whether to enable the use of logical type converters in Avro."
+                        },
+                        {
+                            "name": "key.delegate.deserializer",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The actual key deserializer that the error handling deserializer should delegate to."
+                        },
+                        {
+                            "name": "value.delegate.deserializer",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The actual value deserializer that the error handling deserializer should delegate to."
+                        },
+                        {
+                            "name": "topic.pattern",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The name pattern of the topic."
+                        },
+                        {
+                            "name": "client.id",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "An id string to pass to the server when making requests."
+                        },
+                        {
+                            "name": "enable.auto.commit",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": true,
+                            "description": "Whether the consumer will automatically commit offsets periodically at the interval set by auto.commit.interval.ms."
+                        },
+                        {
+                            "name": "auto.commit.interval.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "5000",
+                            "description": "Offsets are committed automatically with a frequency controlled by the config."
+                        },
+                        {
+                            "name": "failure.retry.count",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The maximum attempts the same Kafka message should be retried in a failure scenario."
+                        },
+                        {
+                            "name": "failure.retry.interval",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The interval between retries in a failure scenario."
+                        },
+                        {
+                            "name": "auto.offset.reset",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "latest",
+                            "description": "Defines what to do when there is no initial offset in Kafka or if the current offset does not exist any more on the server."
+                        },
+                        {
+                            "name": "kafka.header.prefix",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The prefix for Kafka headers."
+                        },
+                        {
+                            "name": "exclude.internal.topics",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "true",
+                            "description": "Whether internal topics matching a subscribed pattern should be excluded from the subscription."
+                        },
+                        {
+                            "name": "check.crcs",
+                            "type": "boolean",
+                            "required": false,
+                            "defaultValue": "true",
+                            "description": "Automatically check the CRC32 of the records consumed."
+                        },
+                        {
+                            "name": "topic.partitions",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Comma separated list of partitions of the topic which the consumer has subscribed to."
+                        },
+                        {
+                            "name": "partition.assignment.strategy",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "org.apache.kafka.clients.consumer.RangeAssignor",
+                            "description": "A list of class names or class types, ordered by preference, of supported partition assignment strategies."
+                        },
+                        {
+                            "name": "interceptor.classes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "A list of classes to use as interceptors."
+                        },
+                        {
+                            "name": "metadata.max.age.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The period of time in milliseconds after which we force a refresh of metadata"
+                        },
+                        {
+                            "name": "fetch.min.bytes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The minimum amount of data the server should return for a fetch request."
+                        },
+                        {
+                            "name": "fetch.max.bytes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The maximum amount of data the server should return for a fetch request."
+                        },
+                        {
+                            "name": "max.partition.fetch.bytes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The maximum amount of data per-partition the server will return."
+                        },
+                        {
+                            "name": "max.poll.interval.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "300000",
+                            "description": "The maximum delay between polls when using consumer group management."
+                        },
+                        {
+                            "name": "max.poll.records",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "500",
+                            "description": "The maximum number of records returned in a single poll"
+                        },
+                        {
+                            "name": "fetch.max.wait.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "500",
+                            "description": "The maximum amount of time the server will block before answering the fetch request if there isn\u2019t sufficient data to immediately satisfy the requirement given by fetch.min.bytes."
+                        },
+                        {
+                            "name": "receive.buffer.bytes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "65536",
+                            "description": "The size of the TCP receive buffer to use when reading data."
+                        },
+                        {
+                            "name": "send.buffer.bytes",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "131072",
+                            "description": "The size of the TCP send buffer (SO_SNDBUF) to use when sending data."
+                        },
+                        {
+                            "name": "request.timeout.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "305000",
+                            "description": "The maximum amount of time the client will wait for the response of a request."
+                        },
+                        {
+                            "name": "reconnect.backoff.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "50",
+                            "description": "The amount of time to wait before attempting to reconnect to a given host."
+                        },
+                        {
+                            "name": "retry.backoff.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "100",
+                            "description": "The amount of time to wait before attempting to retry a failed request to a given topic partition."
+                        },
+                        {
+                            "name": "session.timeout.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The timeout used to detect client failures when using Kafka\u2019s group management facility."
+                        },
+                        {
+                            "name": "connections.max.idle.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "540000",
+                            "description": "Close idle connections after the number of milliseconds specified by this config."
+                        },
+                        {
+                            "name": "heartbeat.interval.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The expected time between heartbeats to the consumer coordinator when using Kafka\u2019s group management facilities."
+                        },
+                        {
+                            "name": "security.protocol",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "PLAINTEXT",
+                            "description": "Protocol used to communicate with brokers."
+                        },
+                        {
+                            "name": "ssl.keystore.location",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The location of the key store file."
+                        },
+                        {
+                            "name": "ssl.keystore.password",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The store password for the key store file."
+                        },
+                        {
+                            "name": "ssl.key.password",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The password of the private key in the key store file or the PEM key."
+                        },
+                        {
+                            "name": "ssl.keystore.type",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The file format of the key store file."
+                        },
+                        {
+                            "name": "ssl.truststore.location",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The location of the trust store file."
+                        },
+                        {
+                            "name": "ssl.truststore.password",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The password for the trust store file."
+                        },
+                        {
+                            "name": "ssl.enabled.protocols",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The list of protocols enabled for SSL connections."
+                        },
+                        {
+                            "name": "ssl.protocol",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The SSL protocol used to generate the SSLContext."
+                        },
+                        {
+                            "name": "ssl.provider",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The name of the security provider used for SSL connections."
+                        },
+                        {
+                            "name": "ssl.truststore.type",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The file format of the trust store file."
+                        },
+                        {
+                            "name": "ssl.cipher.suites",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "A list of cipher suites."
+                        },
+                        {
+                            "name": "ssl.endpoint.identification.algorithm",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The endpoint identification algorithm to validate server hostname using server certificate."
+                        },
+                        {
+                            "name": "ssl.keymanager.algorithm",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The algorithm used by key manager factory for SSL connections."
+                        },
+                        {
+                            "name": "ssl.secure.random.implementation",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The SecureRandom PRNG implementation to use for SSL cryptography operations."
+                        },
+                        {
+                            "name": "ssl.trustmanager.algorithm",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The algorithm used by trust manager factory for SSL connections."
+                        },
+                        {
+                            "name": "sasl.jaas.config",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "JAAS login context parameters for SASL connections in the format used by JAAS configuration files."
+                        },
+                        {
+                            "name": "sasl.client.callback.handler.class",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The fully qualified name of a SASL client callback handler class that implements the AuthenticateCallbackHandler interface."
+                        },
+                        {
+                            "name": "sasl.login.class",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The fully qualified name of a class that implements the Login interface."
+                        },
+                        {
+                            "name": "sasl.kerberos.service.name",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The Kerberos principal name that Kafka runs as."
+                        },
+                        {
+                            "name": "sasl.mechanism",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "SASL mechanism used for client connections."
+                        },
+                        {
+                            "name": "sasl.kerberos.kinit.cmd",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Kerberos kinit command path."
+                        },
+                        {
+                            "name": "sasl.kerberos.min.time.before.relogin",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Login thread sleep time between refresh attempts."
+                        },
+                        {
+                            "name": "sasl.kerberos.ticket.renew.jitter",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Percentage of random jitter added to the renewal time."
+                        },
+                        {
+                            "name": "sasl.kerberos.ticket.renew.window.factor",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Login thread will sleep until the specified window factor of time from last refresh to ticket\u2019s expiry has been reached, at which time it will try to renew the ticket."
+                        },
+                        {
+                            "name": "sasl.oauthbearer.token.endpoint.url",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The URL for the OAuth/OIDC identity provider."
+                        },
+                        {
+                            "name": "sasl.oauthbearer.scope.claim.name",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The OAuth claim for the scope is often named \u2018scope\u2019, but this setting can provide a different name to use for the scope included in the JWT payload\u2019s claims."
+                        },
+                        {
+                            "name": "sasl.login.callback.handler.class",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The fully qualified name of a SASL login callback handler class that implements the AuthenticateCallbackHandler interface."
+                        },
+                        {
+                            "name": "sasl.login.connect.timeout.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The value in milliseconds for the external authentication provider connection timeout."
+                        },
+                        {
+                            "name": "sasl.login.read.timeout.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The value in milliseconds for the external authentication provider read timeout."
+                        },
+                        {
+                            "name": "sasl.login.retry.backoff.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The value in milliseconds for the initial wait between login attempts to the external authentication provider."
+                        },
+                        {
+                            "name": "sasl.login.retry.backoff.max.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The value in milliseconds for the maximum wait between login attempts to the external authentication provider."
+                        },
+                        {
+                            "name": "metric.reporters",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "A list of classes to use as metrics reporters."
+                        },
+                        {
+                            "name": "metrics.num.samples",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "2",
+                            "description": "The number of samples maintained to compute metrics."
+                        },
+                        {
+                            "name": "metrics.recording.level",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "INFO",
+                            "description": "The highest recording level for metrics."
+                        },
+                        {
+                            "name": "metrics.sample.window.ms",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "30000",
+                            "description": "The window of time a metrics sample is computed over."
+                        }
+                    ],
+                    "isHidden": false
+                }
+            ],
+            "connections": []
         },
         {
             "tagName": "v1.2.6",
