@@ -17,7 +17,7 @@
     ],
     "releases": [
         {
-            "tagName": "v2.0.3",
+            "tagName": "v2.0.4",
             "products": [
                 "MI 4.4.0"
             ],
@@ -44,7 +44,7 @@
                             "name": "generateSequences",
                             "type": "checkbox",
                             "required": false,
-                            "defaultValue": true,
+                            "defaultValue": "True",
                             "description": ""
                         },
                         {
@@ -65,7 +65,7 @@
                             "name": "suspend",
                             "type": "boolean",
                             "required": false,
-                            "defaultValue": false,
+                            "defaultValue": "False",
                             "description": "Suspend Inbound"
                         },
                         {
@@ -79,14 +79,14 @@
                             "name": "sequential",
                             "type": "boolean",
                             "required": false,
-                            "defaultValue": true,
+                            "defaultValue": "True",
                             "description": "The behaviour when executing the given sequence."
                         },
                         {
                             "name": "coordination",
                             "type": "boolean",
                             "required": false,
-                            "defaultValue": true,
+                            "defaultValue": "True",
                             "description": "In a clustered setup, this will run the inbound only in a single worker node."
                         },
                         {
@@ -163,7 +163,7 @@
                             "name": "avro.use.logical.type.converters",
                             "type": "boolean",
                             "required": false,
-                            "defaultValue": false,
+                            "defaultValue": "False",
                             "description": "Whether to enable the use of logical type converters in Avro."
                         },
                         {
@@ -198,7 +198,7 @@
                             "name": "enable.auto.commit",
                             "type": "boolean",
                             "required": false,
-                            "defaultValue": true,
+                            "defaultValue": "True",
                             "description": "Whether the consumer will automatically commit offsets periodically at the interval set by auto.commit.interval.ms."
                         },
                         {
