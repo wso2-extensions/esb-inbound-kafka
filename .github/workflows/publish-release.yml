@@ -113,7 +113,7 @@ jobs:
                           'name': value.get('name', ''),
                           'type': value.get('inputType', ''),
                           'required': value.get('required', '').lower() == 'true',
-                          'defaultValue': value.get('defaultValue', ''),
+                          'defaultValue': str(value.get('defaultValue', '')),
                           'description': value.get('helpTip', '')
                       })
                   
