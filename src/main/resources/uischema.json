@@ -319,7 +319,7 @@
               "defaultValue": "5000",
               "required": "false",
               "helpTip": "Offsets are committed automatically with a frequency controlled by the config.",
-              "enableCondition": [{"enable.auto.commit":"true"}]
+              "enableCondition": [{"enable.auto.commit":true}]
             }
           },
           {
@@ -330,7 +330,7 @@
               "inputType": "string",
               "required": "false",
               "helpTip": "The maximum attempts the same Kafka message should be retried in a failure scenario.",
-              "enableCondition": [{"enable.auto.commit":"false"}]
+              "enableCondition": [{"enable.auto.commit":false}]
             }
           },
           {
@@ -341,7 +341,7 @@
               "inputType": "string",
               "required": "false",
               "helpTip": "The interval between retries in a failure scenario.",
-              "enableCondition": [{"enable.auto.commit":"false"}]
+              "enableCondition": [{"enable.auto.commit":false}]
             }
           },
           {
