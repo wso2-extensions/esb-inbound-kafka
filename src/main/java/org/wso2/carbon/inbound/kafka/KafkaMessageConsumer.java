@@ -17,6 +17,7 @@
  */
 package org.wso2.carbon.inbound.kafka;
 
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 import org.apache.avro.generic.GenericData;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.builder.Builder;
@@ -43,7 +44,6 @@ import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.mediators.base.SequenceMediator;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
-import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -85,6 +85,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private int retryCounter = 0;
     private long failureRetryInterval = -1;
     private String kafkaHeaderPrefix = "";
+    private boolean isPaused = false;  // No need for volatile with synchronized access
+    private final Object pauseLock = new Object();  // Dedicated lock for pause/resume operations
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -101,6 +103,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      */
     private void consumeKafkaRecords() {
         try {
+            // Skip polling if the consumer is paused
+            synchronized (pauseLock) {
+                if (isPaused) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Kafka consumer is paused, skipping poll for " + name);
+                    }
+                    return;
+                }
+            }
+
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.of(Long.parseLong(pollTimeout),
                     ChronoUnit.MILLIS));
             commitRecords(records);
@@ -594,6 +606,32 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (Exception e) {
             log.error("Error while shutdown the Kafka consumer " + name + " " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Resume the connection to the Kafka.
+     */
+    public void resume() {
+        synchronized (pauseLock) {
+            if (!isPaused) {
+                return; // Already running
+            }
+            isPaused = false;
+            log.info("Resumed Kafka consumer for " + name);
+        }
+    }
+
+    /**
+     * Pause the connection to the Kafka.
+     */
+    public void pause() {
+        synchronized (pauseLock) {
+            if (isPaused) {
+                return; // Already paused
+            }
+            isPaused = true;
+            log.info("Paused Kafka consumer for " + name);
         }
     }
 
