@@ -63,18 +63,6 @@
               "enableCondition": [{"generateSequences":false}],
               "helpTip": "Error sequence to invoke on fault"
             }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "suspend",
-              "displayName": "Suspend Inbound",
-              "inputType": "boolean",
-              "defaultValue": false,
-              "hidden": true,
-              "required": "false",
-              "helpTip": "Suspend Inbound"
-            }
           }
         ]
       }
@@ -115,6 +103,18 @@
               "defaultValue": true,
               "required": "false",
               "helpTip": "In a clustered setup, this will run the inbound only in a single worker node."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "suspend",
+              "displayName": "Suspend Inbound",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "hidden": false,
+              "required": "false",
+              "helpTip": "Enable this option to suspend the inbound endpoint immediately after deployment."
             }
           }
         ]
