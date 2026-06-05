@@ -50,12 +50,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -81,6 +84,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private Properties kafkaProperties;
     private boolean isRegexPattern = false;
     private boolean isDisableAutoCommit;
+    private boolean isBatchEnabled = false;
     private int failureRetryCount;
     private int retryCounter = 0;
     private long failureRetryInterval = -1;
@@ -115,7 +119,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.of(Long.parseLong(pollTimeout),
                     ChronoUnit.MILLIS));
-            commitRecords(records);
+            if (isBatchEnabled) {
+                commitRecordsAsBatch(records);
+            } else {
+                commitRecords(records);
+            }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer " + consumer);
             consumer.close();
@@ -290,12 +298,287 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Inject all records from a single poll as a single JSON array message to the insequence.
+     * Poison pills and null-value records are skipped individually before the batch is assembled.
+     * With manual commit (enable.auto.commit=false), the entire batch is committed on success or
+     * seeked back to each partition's first offset on failure; retry logic mirrors the per-record
+     * behaviour.
+     *
+     * @param records ConsumerRecords from a single poll
+     */
+    private void commitRecordsAsBatch(ConsumerRecords<byte[], byte[]> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+
+        List<ConsumerRecord<byte[], byte[]>> validRecords = new ArrayList<>();
+        List<ConsumerRecord<byte[], byte[]>> poisonPillRecords = new ArrayList<>();
+        List<String> poisonPillErrors = new ArrayList<>();
+        Map<TopicPartition, Long> firstOffsets = new HashMap<>();
+        Map<TopicPartition, Long> lastOffsets = new HashMap<>();
+
+        for (TopicPartition partition : records.partitions()) {
+            for (ConsumerRecord<byte[], byte[]> record : records.records(partition)) {
+                lastOffsets.put(partition, record.offset());
+                if (record.value() == null) {
+                    if (isPoisonPill(record)) {
+                        log.warn("A poison pill was detected in batch for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset()
+                                + ". Error details will be included in the batch injected to the `onError` sequence: "
+                                + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
+                        poisonPillRecords.add(record);
+                        poisonPillErrors.add(extractPoisonPillError(record));
+                    } else {
+                        log.warn("A null record was passed and skipped in batch for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset());
+                    }
+                } else {
+                    firstOffsets.putIfAbsent(partition, record.offset());
+                    validRecords.add(record);
+                }
+            }
+        }
+
+        if (!poisonPillRecords.isEmpty()) {
+            injectBatchPoisonPills(poisonPillRecords, poisonPillErrors);
+        }
+
+        if (validRecords.isEmpty()) {
+            if (isDisableAutoCommit) {
+                commitOffsets(lastOffsets, 1);
+            }
+            return;
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("Injecting a batch of " + validRecords.size() + " Kafka messages for inbound mediation."
+                    + " Endpoint: " + name);
+        }
+
+        MessageContext msgCtx = createBatchMessageContext(validRecords.size());
+        boolean isConsumed = injectMessage(buildBatchPayload(validRecords), "application/json", msgCtx);
+
+        if (isDisableAutoCommit) {
+            if (isConsumed) {
+                retryCounter = 0;
+                commitOffsets(lastOffsets, 1);
+            } else {
+                if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
+                    try {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Failed Kafka batch will be retried after max(poll_interval,"
+                                    + " failure_retry_interval): "
+                                    + Long.max(failureRetryInterval, scanInterval) + "ms.");
+                        }
+                        Thread.sleep(this.failureRetryInterval);
+                    } catch (InterruptedException e) {
+                        log.error("The interval for retrying batch failures was interrupted while waiting.");
+                    }
+                }
+                if (failureRetryCount > 0) {
+                    retryCounter++;
+                }
+                if (retryCounter < failureRetryCount || failureRetryCount < 0) {
+                    for (Map.Entry<TopicPartition, Long> entry : firstOffsets.entrySet()) {
+                        consumer.seek(entry.getKey(), entry.getValue());
+                    }
+                } else {
+                    log.warn("The batch offset set to the next record since failure retry count exceeded.");
+                    commitOffsets(lastOffsets, 1);
+                    retryCounter = 0;
+                    injectErrorMessage("Failed to successfully mediate the batch message to/in the sequence: "
+                            + this.injectingSeq + " of Kafka Inbound Endpoint: " + name + ", even after "
+                            + failureRetryCount + " retries.", KafkaConstants.RETRY_EXHAUSTED, msgCtx);
+                }
+            }
+        }
+    }
+
+    /**
+     * Deserialize and return the error message from a poison pill record's exception header.
+     */
+    private String extractPoisonPillError(ConsumerRecord<byte[], byte[]> record) {
+        Header keyHeader = record.headers().lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER);
+        Header valueHeader = record.headers().lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER);
+        byte[] headerValue = keyHeader != null ? keyHeader.value() : valueHeader.value();
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(headerValue))) {
+            return ((KafkaException) ois.readObject()).getMessage();
+        } catch (ClassNotFoundException | IOException e) {
+            log.error("Could not deserialize the poison pill exception header for Kafka Inbound Endpoint: "
+                    + name, e);
+            return "Unknown deserialization error";
+        }
+    }
+
+    /**
+     * Build a JSON array from the poison pill records and their extracted error messages, then
+     * inject once to the configured onError sequence with ERROR_CODE and ERROR_MESSAGE properties.
+     */
+    private void injectBatchPoisonPills(List<ConsumerRecord<byte[], byte[]>> poisonPillRecords,
+                                        List<String> errorMessages) {
+        if (StringUtils.isEmpty(this.onErrorSeq)) {
+            log.error("Could not mediate batch poison pill errors as the 'onError' sequence name is not "
+                    + "specified for Kafka Inbound Endpoint: " + name);
+            return;
+        }
+        SequenceMediator errorSeq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
+                .getSequence(this.onErrorSeq);
+        if (errorSeq == null) {
+            log.error("Could not mediate batch poison pill errors as the 'onError' sequence with name: "
+                    + this.onErrorSeq + " not found for Kafka Inbound Endpoint: " + name);
+            return;
+        }
+
+        MessageContext msgCtx = createMessageContext();
+        msgCtx.setProperty(KafkaConstants.KAFKA_BATCH_SIZE, poisonPillRecords.size());
+        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
+        msgCtx.setProperty(SynapseConstants.ERROR_CODE, KafkaConstants.POISON_PILL_DETECTED);
+        msgCtx.setProperty(SynapseConstants.ERROR_MESSAGE, poisonPillRecords.size()
+                + " poison pill(s) detected in batch of Kafka Inbound Endpoint: " + name);
+
+        try {
+            String payload = buildPoisonPillBatchPayload(poisonPillRecords, errorMessages);
+            org.apache.axis2.context.MessageContext axis2MsgCtx =
+                    ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
+            Builder builder = (Builder) BuilderUtil.getBuilderFromSelector("application/json", axis2MsgCtx);
+            if (builder == null) {
+                builder = new SOAPBuilder();
+            }
+            OMElement documentElement = builder.processDocument(
+                    new AutoCloseInputStream(new ByteArrayInputStream(payload.getBytes())),
+                    "application/json", axis2MsgCtx);
+            msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement));
+        } catch (Exception e) {
+            log.error("Error while building batch poison pill payload for 'onError' sequence: "
+                    + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name, e);
+            return;
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("Injecting batch of " + poisonPillRecords.size()
+                    + " poison pill(s) to 'onError' sequence: " + this.onErrorSeq
+                    + " of Kafka Inbound Endpoint: " + name);
+        }
+        if (!this.synapseEnvironment.injectInbound(msgCtx, errorSeq, this.sequential)) {
+            log.warn("Could not inject the batch poison pill details to 'onError' sequence: "
+                    + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
+        }
+    }
+
+    /**
+     * Build a JSON array where each element contains the record metadata and its deserialization
+     * error message.
+     */
+    private String buildPoisonPillBatchPayload(List<ConsumerRecord<byte[], byte[]>> records,
+                                               List<String> errorMessages) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < records.size(); i++) {
+            ConsumerRecord<byte[], byte[]> record = records.get(i);
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append("{");
+            sb.append("\"partition\":").append(record.partition()).append(",");
+            sb.append("\"offset\":").append(record.offset()).append(",");
+            sb.append("\"timestamp\":").append(record.timestamp()).append(",");
+            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
+            Object key = record.key();
+            if (key == null) {
+                sb.append("\"key\":null,");
+            } else {
+                sb.append("\"key\":\"").append(escapeJson(key.toString())).append("\",");
+            }
+            sb.append("\"errorMessage\":\"").append(escapeJson(errorMessages.get(i))).append("\"");
+            sb.append("}");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /**
+     * Commit the given per-partition offsets adjusted by the provided delta.
+     */
+    private void commitOffsets(Map<TopicPartition, Long> offsets, long delta) {
+        Map<TopicPartition, OffsetAndMetadata> commitMap = new HashMap<>();
+        for (Map.Entry<TopicPartition, Long> entry : offsets.entrySet()) {
+            commitMap.put(entry.getKey(), new OffsetAndMetadata(entry.getValue() + delta));
+        }
+        consumer.commitSync(commitMap);
+    }
+
+    /**
+     * Build a JSON array string from the given records. Each element contains
+     * partition, offset, timestamp, topic, key, and value fields.
+     */
+    private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < records.size(); i++) {
+            ConsumerRecord<byte[], byte[]> record = records.get(i);
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append("{");
+            sb.append("\"partition\":").append(record.partition()).append(",");
+            sb.append("\"offset\":").append(record.offset()).append(",");
+            sb.append("\"timestamp\":").append(record.timestamp()).append(",");
+            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
+            // Access via raw type to avoid compiler-inserted checkcast when the configured
+            // deserializer returns a type other than byte[] (e.g. StringDeserializer).
+            @SuppressWarnings("rawtypes")
+            ConsumerRecord rawRecord = record;
+            Object key = rawRecord.key();
+            Object value = rawRecord.value();
+            if (key == null) {
+                sb.append("\"key\":null,");
+            } else {
+                sb.append("\"key\":\"").append(escapeJson(deserializedToString(key))).append("\",");
+            }
+            sb.append("\"value\":\"").append(escapeJson(deserializedToString(value))).append("\"");
+            sb.append("}");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private String deserializedToString(Object value) {
+        if (value instanceof byte[]) {
+            return new String((byte[]) value, StandardCharsets.UTF_8);
+        }
+        return String.valueOf(value);
+    }
+
+    private String escapeJson(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private MessageContext createBatchMessageContext(int batchSize) {
+        MessageContext msgCtx = createMessageContext();
+        msgCtx.setProperty(KafkaConstants.KAFKA_BATCH_SIZE, batchSize);
+        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
+        return msgCtx;
+    }
+
+    /**
      * Populate properties that are related to the functionality of Kafka Inbound Endpoint feature.
      *
      * @param properties properties configured in the Kafka Inbound Endpoint
      */
     private void populateOtherProperties(Properties properties) {
         checkDisableAutoCommit(properties);
+        isBatchEnabled = Boolean.parseBoolean(
+                properties.getProperty(KafkaConstants.BATCH_MESSAGES_ENABLED,
+                        KafkaConstants.BATCH_MESSAGES_ENABLED_DEFAULT));
         if (properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX) != null) {
             kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
         }

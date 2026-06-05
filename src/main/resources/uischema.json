@@ -358,6 +358,17 @@
           {
             "type": "attribute",
             "value": {
+              "name": "batch.messages.enabled",
+              "displayName": "Enable Batch Messages",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "When enabled, all records from a single poll are injected as a JSON array to the insequence in one invocation instead of one record at a time. Poison pill errors are also batched and injected once to the onError sequence."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "kafka.header.prefix",
               "displayName": "Kafka Header Prefix",
               "inputType": "string",
