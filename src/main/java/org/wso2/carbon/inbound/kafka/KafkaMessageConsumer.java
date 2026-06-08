@@ -510,34 +510,20 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
-     * Build a JSON array string from the given records. Each element contains
-     * partition, offset, timestamp, topic, key, and value fields.
+     * Build a JSON array string from the given records. Each element is the raw record value,
+     * matching the payload format used in single-record mode.
      */
     private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < records.size(); i++) {
-            ConsumerRecord<byte[], byte[]> record = records.get(i);
-            if (i > 0) {
-                sb.append(",");
-            }
-            sb.append("{");
-            sb.append("\"partition\":").append(record.partition()).append(",");
-            sb.append("\"offset\":").append(record.offset()).append(",");
-            sb.append("\"timestamp\":").append(record.timestamp()).append(",");
-            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
             // Access via raw type to avoid compiler-inserted checkcast when the configured
             // deserializer returns a type other than byte[] (e.g. StringDeserializer).
             @SuppressWarnings("rawtypes")
-            ConsumerRecord rawRecord = record;
-            Object key = rawRecord.key();
-            Object value = rawRecord.value();
-            if (key == null) {
-                sb.append("\"key\":null,");
-            } else {
-                sb.append("\"key\":\"").append(escapeJson(deserializedToString(key))).append("\",");
+            ConsumerRecord rawRecord = records.get(i);
+            if (i > 0) {
+                sb.append(",");
             }
-            sb.append("\"value\":\"").append(escapeJson(deserializedToString(value))).append("\"");
-            sb.append("}");
+            sb.append(deserializedToString(rawRecord.value()));
         }
         sb.append("]");
         return sb.toString();
