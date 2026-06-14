@@ -481,10 +481,9 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 sb.append(",");
             }
             sb.append("{");
+            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
             sb.append("\"partition\":").append(record.partition()).append(",");
             sb.append("\"offset\":").append(record.offset()).append(",");
-            sb.append("\"timestamp\":").append(record.timestamp()).append(",");
-            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
             Object key = record.key();
             if (key == null) {
                 sb.append("\"key\":null,");
