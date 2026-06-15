@@ -358,7 +358,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
 
         MessageContext msgCtx = createBatchMessageContext(validRecords.size());
-        boolean isConsumed = injectMessage(buildBatchPayload(validRecords), "application/json", msgCtx);
+        boolean isConsumed = injectMessage(buildBatchPayload(validRecords), getBatchContentType(), msgCtx);
 
         if (isDisableAutoCommit) {
             if (isConsumed) {
@@ -513,10 +513,38 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * matching the payload format used in single-record mode.
      */
     private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        String type = contentType != null ? contentType.split(";")[0].trim() : "";
+        if ("application/xml".equalsIgnoreCase(type) || "text/xml".equalsIgnoreCase(type)) {
+            return buildBatchXmlPayload(records);
+        }
+        if ("text/plain".equalsIgnoreCase(type)) {
+            return buildBatchTextPayload(records);
+        }
+        return buildBatchJsonPayload(records);
+    }
+
+    private String getBatchContentType() {
+        String type = contentType != null ? contentType.split(";")[0].trim() : "";
+        if ("text/plain".equalsIgnoreCase(type)) {
+            return "application/xml";
+        }
+        return contentType;
+    }
+
+    private String buildBatchTextPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder("<messages>");
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            sb.append("<text xmlns=\"http://ws.apache.org/commons/ns/payload\">")
+                    .append(escapeXml(deserializedToString(record.value())))
+                    .append("</text>");
+        }
+        sb.append("</messages>");
+        return sb.toString();
+    }
+
+    private String buildBatchJsonPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < records.size(); i++) {
-            // Access via raw type to avoid compiler-inserted checkcast when the configured
-            // deserializer returns a type other than byte[] (e.g. StringDeserializer).
             @SuppressWarnings("rawtypes")
             ConsumerRecord rawRecord = records.get(i);
             if (i > 0) {
@@ -528,11 +556,33 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return sb.toString();
     }
 
+    private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder("<messages>");
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            @SuppressWarnings("rawtypes")
+            ConsumerRecord rawRecord = (ConsumerRecord) record;
+            sb.append(escapeXml(deserializedToString(rawRecord.value())));
+        }
+        sb.append("</messages>");
+        return sb.toString();
+    }
+
     private String deserializedToString(Object value) {
         if (value instanceof byte[]) {
             return new String((byte[]) value, StandardCharsets.UTF_8);
         }
         return String.valueOf(value);
+    }
+
+    private String escapeXml(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
     }
 
     private String escapeJson(String input) {
