@@ -612,8 +612,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private void populateOtherProperties(Properties properties) {
         checkDisableAutoCommit(properties);
         isBatchEnabled = Boolean.parseBoolean(
-                properties.getProperty(KafkaConstants.BATCH_MESSAGES_ENABLED,
-                        KafkaConstants.BATCH_MESSAGES_ENABLED_DEFAULT));
+                properties.getProperty(KafkaConstants.BATCH_PROCESSING_ENABLED,
+                        KafkaConstants.BATCH_PROCESSING_ENABLED_DEFAULT));
         if (properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX) != null) {
             kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
         }

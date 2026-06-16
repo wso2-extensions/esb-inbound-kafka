@@ -159,8 +159,8 @@ public class KafkaConstants {
             "org.wso2.carbon.inbound.kafka.deserializer.ErrorHandlingDeserializer";
 
     // Batch processing
-    public static final String BATCH_MESSAGES_ENABLED = "batch.messages.enabled";
-    public static final String BATCH_MESSAGES_ENABLED_DEFAULT = "false";
+    public static final String BATCH_PROCESSING_ENABLED = "batch.processing.enabled";
+    public static final String BATCH_PROCESSING_ENABLED_DEFAULT = "false";
     public static final String KAFKA_BATCH_SIZE = "batchSize";
 
     // Error codes

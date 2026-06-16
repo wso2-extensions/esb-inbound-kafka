@@ -107,7 +107,7 @@ class KafkaMessageConsumerBatchTest {
         p.setProperty(KafkaConstants.POLL_TIMEOUT, "100");
         p.setProperty(KafkaConstants.TOPIC_NAME, TOPIC);
         p.setProperty(KafkaConstants.CONTENT_TYPE, "application/json");
-        p.setProperty(KafkaConstants.BATCH_MESSAGES_ENABLED, String.valueOf(batchEnabled));
+        p.setProperty(KafkaConstants.BATCH_PROCESSING_ENABLED, String.valueOf(batchEnabled));
         if (manualCommit) {
             p.setProperty(KafkaConstants.ENABLE_AUTO_COMMIT, "false");
             p.setProperty(KafkaConstants.FAILURE_RETRY_COUNT, "3");
@@ -583,13 +583,13 @@ class KafkaMessageConsumerBatchTest {
     @Test
     void isBatchEnabled_whenPropertySetToTrue_fieldIsTrue() throws Exception {
         assertTrue((Boolean) getField(consumer, "isBatchEnabled"),
-                "consumer created with batch.messages.enabled=true should have isBatchEnabled=true");
+                "consumer created with batch.processing.enabled=true should have isBatchEnabled=true");
     }
 
     @Test
     void isBatchEnabled_whenPropertyAbsent_defaultIsFalse() throws Exception {
         Properties props = baseProps(false, false);
-        props.remove(KafkaConstants.BATCH_MESSAGES_ENABLED);
+        props.remove(KafkaConstants.BATCH_PROCESSING_ENABLED);
         KafkaMessageConsumer c = new KafkaMessageConsumer(props, "ep",
                 synapseEnvironment, 1000L, INBOUND_SEQ, ERROR_SEQ, false, true);
         assertFalse((Boolean) getField(c, "isBatchEnabled"),

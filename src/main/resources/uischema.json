@@ -358,8 +358,8 @@
           {
             "type": "attribute",
             "value": {
-              "name": "batch.messages.enabled",
-              "displayName": "Enable Batch Messages",
+              "name": "batch.processing.enabled",
+              "displayName": "Enable Batch Processing",
               "inputType": "boolean",
               "defaultValue": false,
               "required": "false",
