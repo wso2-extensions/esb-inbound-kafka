@@ -407,18 +407,18 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if ("application/xml".equalsIgnoreCase(type) || "text/xml".equalsIgnoreCase(type)) {
             return buildBatchXmlPayload(records);
         }
-        if ("text/plain".equalsIgnoreCase(type)) {
-            return buildBatchTextPayload(records);
+        if ("application/json".equalsIgnoreCase(type)) {
+            return buildBatchJsonPayload(records);
         }
-        return buildBatchJsonPayload(records);
+        return buildBatchTextPayload(records);
     }
 
     private String getBatchContentType() {
         String type = contentType != null ? contentType.split(";")[0].trim() : "";
-        if ("text/plain".equalsIgnoreCase(type)) {
-            return "application/xml";
+        if ("application/json".equalsIgnoreCase(type)) {
+            return contentType;
         }
-        return contentType;
+        return "application/xml";
     }
 
     private String buildBatchTextPayload(List<ConsumerRecord<byte[], byte[]>> records) {
