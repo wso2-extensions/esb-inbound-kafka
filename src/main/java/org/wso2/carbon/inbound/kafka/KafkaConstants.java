@@ -161,8 +161,6 @@ public class KafkaConstants {
     // Batch processing
     public static final String BATCH_PROCESSING_ENABLED = "batch.processing.enabled";
     public static final String BATCH_PROCESSING_ENABLED_DEFAULT = "false";
-    public static final String KAFKA_BATCH_SIZE = "batchSize";
-
     // Error codes
     public static final String POISON_PILL_DETECTED = "700510";
     public static final String RETRY_EXHAUSTED = "700511";

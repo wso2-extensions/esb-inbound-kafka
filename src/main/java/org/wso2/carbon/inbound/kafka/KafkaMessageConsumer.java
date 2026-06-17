@@ -357,7 +357,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     + " Endpoint: " + name);
         }
 
-        MessageContext msgCtx = createBatchMessageContext(validRecords.size());
+        MessageContext msgCtx = createBatchMessageContext();
         boolean isConsumed = injectMessage(buildBatchPayload(validRecords), getBatchContentType(), msgCtx);
 
         if (isDisableAutoCommit) {
@@ -534,7 +534,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
             sb.append("<text xmlns=\"http://ws.apache.org/commons/ns/payload\">")
-                    .append(escapeXml(deserializedToString(record.value())))
+                    .append(escapeXml(new String(record.value(), StandardCharsets.UTF_8)))
                     .append("</text>");
         }
         sb.append("</messages>");
@@ -547,7 +547,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             if (i > 0) {
                 sb.append(",");
             }
-            sb.append(deserializedToString(records.get(i).value()));
+            sb.append(new String(records.get(i).value(), StandardCharsets.UTF_8));
         }
         sb.append("]");
         return sb.toString();
@@ -556,17 +556,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
-            sb.append(escapeXml(deserializedToString(record.value())));
+            sb.append(escapeXml(new String(record.value(), StandardCharsets.UTF_8)));
         }
         sb.append("</messages>");
         return sb.toString();
-    }
-
-    private String deserializedToString(Object value) {
-        if (value instanceof byte[]) {
-            return new String((byte[]) value, StandardCharsets.UTF_8);
-        }
-        return String.valueOf(value);
     }
 
     private String escapeXml(String input) {
@@ -591,9 +584,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 .replace("\t", "\\t");
     }
 
-    private MessageContext createBatchMessageContext(int batchSize) {
+    private MessageContext createBatchMessageContext() {
         MessageContext msgCtx = createMessageContext();
-        msgCtx.setProperty(KafkaConstants.KAFKA_BATCH_SIZE, batchSize);
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         return msgCtx;

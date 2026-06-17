@@ -386,26 +386,6 @@ class KafkaMessageConsumerBatchTest {
         }
     }
 
-    @Test
-    void commitRecordsAsBatch_validRecords_autoCommit_setsBatchSizeOnMessageContext()
-            throws Exception {
-        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
-             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
-             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
-                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
-                             .thenReturn(omElement))) {
-            stubAxis2(bu, tu);
-            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
-
-            callPrivate(consumer, "commitRecordsAsBatch",
-                    new Class[]{ConsumerRecords.class},
-                    makeRecords(TOPIC, 0, Arrays.asList(
-                            record(TOPIC, 0, 0L, "a".getBytes()),
-                            record(TOPIC, 0, 1L, "b".getBytes()))));
-
-            verify(synapseMessageContext).setProperty(KafkaConstants.KAFKA_BATCH_SIZE, 2);
-        }
-    }
 
     // ── commitRecordsAsBatch — valid records, manual commit ───────────────────
 
