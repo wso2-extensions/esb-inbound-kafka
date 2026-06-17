@@ -432,7 +432,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
 
         MessageContext msgCtx = createMessageContext();
-        msgCtx.setProperty(KafkaConstants.KAFKA_BATCH_SIZE, poisonPillRecords.size());
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         msgCtx.setProperty(SynapseConstants.ERROR_CODE, KafkaConstants.POISON_PILL_DETECTED);
@@ -545,12 +544,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String buildBatchJsonPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < records.size(); i++) {
-            @SuppressWarnings("rawtypes")
-            ConsumerRecord rawRecord = records.get(i);
             if (i > 0) {
                 sb.append(",");
             }
-            sb.append(deserializedToString(rawRecord.value()));
+            sb.append(deserializedToString(records.get(i).value()));
         }
         sb.append("]");
         return sb.toString();
@@ -559,9 +556,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
-            @SuppressWarnings("rawtypes")
-            ConsumerRecord rawRecord = (ConsumerRecord) record;
-            sb.append(escapeXml(deserializedToString(rawRecord.value())));
+            sb.append(escapeXml(deserializedToString(record.value())));
         }
         sb.append("</messages>");
         return sb.toString();
