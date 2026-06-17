@@ -312,8 +312,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
 
         List<ConsumerRecord<byte[], byte[]>> validRecords = new ArrayList<>();
-        List<ConsumerRecord<byte[], byte[]>> poisonPillRecords = new ArrayList<>();
-        List<String> poisonPillErrors = new ArrayList<>();
         Map<TopicPartition, Long> firstOffsets = new HashMap<>();
         Map<TopicPartition, Long> lastOffsets = new HashMap<>();
 
@@ -325,10 +323,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                         log.warn("A poison pill was detected in batch for Topic: " + record.topic()
                                 + ", Partition No: " + record.partition()
                                 + ", Offset: " + record.offset()
-                                + ". Error details will be included in the batch injected to the `onError` sequence: "
-                                + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
-                        poisonPillRecords.add(record);
-                        poisonPillErrors.add(extractPoisonPillError(record));
+                                + " of Kafka Inbound Endpoint: " + name + ". The record will be skipped.");
                     } else {
                         log.warn("A null record was passed and skipped in batch for Topic: " + record.topic()
                                 + ", Partition No: " + record.partition()
@@ -339,10 +334,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     validRecords.add(record);
                 }
             }
-        }
-
-        if (!poisonPillRecords.isEmpty()) {
-            injectBatchPoisonPills(poisonPillRecords, poisonPillErrors);
         }
 
         if (validRecords.isEmpty()) {
@@ -394,106 +385,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 }
             }
         }
-    }
-
-    /**
-     * Deserialize and return the error message from a poison pill record's exception header.
-     */
-    private String extractPoisonPillError(ConsumerRecord<byte[], byte[]> record) {
-        Header keyHeader = record.headers().lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER);
-        Header valueHeader = record.headers().lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER);
-        byte[] headerValue = keyHeader != null ? keyHeader.value() : valueHeader.value();
-        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(headerValue))) {
-            return ((KafkaException) ois.readObject()).getMessage();
-        } catch (ClassNotFoundException | IOException e) {
-            log.error("Could not deserialize the poison pill exception header for Kafka Inbound Endpoint: "
-                    + name, e);
-            return "Unknown deserialization error";
-        }
-    }
-
-    /**
-     * Build a JSON array from the poison pill records and their extracted error messages, then
-     * inject once to the configured onError sequence with ERROR_CODE and ERROR_MESSAGE properties.
-     */
-    private void injectBatchPoisonPills(List<ConsumerRecord<byte[], byte[]>> poisonPillRecords,
-                                        List<String> errorMessages) {
-        if (StringUtils.isEmpty(this.onErrorSeq)) {
-            log.error("Could not mediate batch poison pill errors as the 'onError' sequence name is not "
-                    + "specified for Kafka Inbound Endpoint: " + name);
-            return;
-        }
-        SequenceMediator errorSeq = (SequenceMediator) this.synapseEnvironment.getSynapseConfiguration()
-                .getSequence(this.onErrorSeq);
-        if (errorSeq == null) {
-            log.error("Could not mediate batch poison pill errors as the 'onError' sequence with name: "
-                    + this.onErrorSeq + " not found for Kafka Inbound Endpoint: " + name);
-            return;
-        }
-
-        MessageContext msgCtx = createMessageContext();
-        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
-        msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
-        msgCtx.setProperty(SynapseConstants.ERROR_CODE, KafkaConstants.POISON_PILL_DETECTED);
-        msgCtx.setProperty(SynapseConstants.ERROR_MESSAGE, poisonPillRecords.size()
-                + " poison pill(s) detected in batch of Kafka Inbound Endpoint: " + name);
-
-        try {
-            String payload = buildPoisonPillBatchPayload(poisonPillRecords, errorMessages);
-            org.apache.axis2.context.MessageContext axis2MsgCtx =
-                    ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
-            Builder builder = (Builder) BuilderUtil.getBuilderFromSelector("application/json", axis2MsgCtx);
-            if (builder == null) {
-                builder = new SOAPBuilder();
-            }
-            OMElement documentElement = builder.processDocument(
-                    new AutoCloseInputStream(new ByteArrayInputStream(payload.getBytes())),
-                    "application/json", axis2MsgCtx);
-            msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement));
-        } catch (Exception e) {
-            log.error("Error while building batch poison pill payload for 'onError' sequence: "
-                    + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name, e);
-            return;
-        }
-
-        if (log.isDebugEnabled()) {
-            log.debug("Injecting batch of " + poisonPillRecords.size()
-                    + " poison pill(s) to 'onError' sequence: " + this.onErrorSeq
-                    + " of Kafka Inbound Endpoint: " + name);
-        }
-        if (!this.synapseEnvironment.injectInbound(msgCtx, errorSeq, this.sequential)) {
-            log.warn("Could not inject the batch poison pill details to 'onError' sequence: "
-                    + this.onErrorSeq + " of Kafka Inbound Endpoint: " + name);
-        }
-    }
-
-    /**
-     * Build a JSON array where each element contains the record metadata and its deserialization
-     * error message.
-     */
-    private String buildPoisonPillBatchPayload(List<ConsumerRecord<byte[], byte[]>> records,
-                                               List<String> errorMessages) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < records.size(); i++) {
-            ConsumerRecord<byte[], byte[]> record = records.get(i);
-            if (i > 0) {
-                sb.append(",");
-            }
-            sb.append("{");
-            sb.append("\"topic\":\"").append(escapeJson(record.topic())).append("\",");
-            sb.append("\"partition\":").append(record.partition()).append(",");
-            sb.append("\"offset\":").append(record.offset()).append(",");
-            Object key = record.key();
-            if (key == null) {
-                sb.append("\"key\":null,");
-            } else {
-                sb.append("\"key\":\"").append(escapeJson(key.toString())).append("\",");
-            }
-            sb.append("\"errorMessage\":\"").append(escapeJson(errorMessages.get(i))).append("\"");
-            sb.append("}");
-        }
-        sb.append("]");
-        return sb.toString();
     }
 
     /**
@@ -569,17 +460,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return input.replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
-    }
-
-    private String escapeJson(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
     }
 
     private MessageContext createBatchMessageContext() {
