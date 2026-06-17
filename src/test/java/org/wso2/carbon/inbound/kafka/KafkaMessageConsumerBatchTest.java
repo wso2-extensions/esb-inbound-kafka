@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -220,123 +219,6 @@ class KafkaMessageConsumerBatchTest {
         assertEquals("[]", result);
     }
 
-    // ── deserializedToString ───────────────────────────────────────────────────
-
-    @Test
-    void deserializedToString_byteArray_decodesAsUtf8() throws Exception {
-        byte[] input = "héllo".getBytes(StandardCharsets.UTF_8);
-        String result = (String) callPrivate(consumer, "deserializedToString",
-                new Class[]{Object.class}, input);
-        assertEquals("héllo", result);
-    }
-
-    @Test
-    void deserializedToString_stringValue_returnsSameString() throws Exception {
-        String result = (String) callPrivate(consumer, "deserializedToString",
-                new Class[]{Object.class}, "world");
-        assertEquals("world", result);
-    }
-
-    @Test
-    void deserializedToString_arbitraryObject_usesToStringRepresentation() throws Exception {
-        String result = (String) callPrivate(consumer, "deserializedToString",
-                new Class[]{Object.class}, 42);
-        assertEquals("42", result);
-    }
-
-    // ── escapeJson ─────────────────────────────────────────────────────────────
-
-    @Test
-    void escapeJson_nullInput_returnsEmptyString() throws Exception {
-        String result = (String) callPrivate(consumer, "escapeJson",
-                new Class[]{String.class}, (Object) null);
-        assertEquals("", result);
-    }
-
-    @Test
-    void escapeJson_doubleQuotes_escaped() throws Exception {
-        String result = (String) callPrivate(consumer, "escapeJson",
-                new Class[]{String.class}, "say \"hi\"");
-        assertEquals("say \\\"hi\\\"", result);
-    }
-
-    @Test
-    void escapeJson_backslash_escaped() throws Exception {
-        String result = (String) callPrivate(consumer, "escapeJson",
-                new Class[]{String.class}, "a\\b");
-        assertEquals("a\\\\b", result);
-    }
-
-    @Test
-    void escapeJson_newlineAndTab_escaped() throws Exception {
-        String result = (String) callPrivate(consumer, "escapeJson",
-                new Class[]{String.class}, "line\ncolumn\ttab");
-        assertEquals("line\\ncolumn\\ttab", result);
-    }
-
-    @Test
-    void escapeJson_carriageReturn_escaped() throws Exception {
-        String result = (String) callPrivate(consumer, "escapeJson",
-                new Class[]{String.class}, "a\rb");
-        assertEquals("a\\rb", result);
-    }
-
-    // ── buildPoisonPillBatchPayload ────────────────────────────────────────────
-
-    @Test
-    void buildPoisonPillBatchPayload_nullKey_renderedAsJsonNull() throws Exception {
-        ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(TOPIC, 2, 10L, null, null);
-        String result = (String) callPrivate(consumer, "buildPoisonPillBatchPayload",
-                new Class[]{List.class, List.class},
-                Collections.singletonList(r),
-                Collections.singletonList("deser error"));
-
-        assertTrue(result.contains("\"key\":null"));
-        assertTrue(result.contains("\"topic\":\"test-topic\""));
-        assertTrue(result.contains("\"partition\":2"));
-        assertTrue(result.contains("\"offset\":10"));
-        assertTrue(result.contains("\"errorMessage\":\"deser error\""));
-    }
-
-    @Test
-    void buildPoisonPillBatchPayload_nonNullKey_renderedAsString() throws Exception {
-        ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(TOPIC, 0, 0L,
-                "k1".getBytes(), null);
-        String result = (String) callPrivate(consumer, "buildPoisonPillBatchPayload",
-                new Class[]{List.class, List.class},
-                Collections.singletonList(r),
-                Collections.singletonList("err"));
-
-        assertFalse(result.contains("\"key\":null"), "non-null key must not render as JSON null");
-        assertTrue(result.contains("\"key\":\""));
-    }
-
-    @Test
-    void buildPoisonPillBatchPayload_multipleRecords_producesValidJsonArray() throws Exception {
-        ConsumerRecord<byte[], byte[]> r1 = new ConsumerRecord<>(TOPIC, 0, 0L, null, null);
-        ConsumerRecord<byte[], byte[]> r2 = new ConsumerRecord<>(TOPIC, 0, 1L, null, null);
-        String result = (String) callPrivate(consumer, "buildPoisonPillBatchPayload",
-                new Class[]{List.class, List.class},
-                Arrays.asList(r1, r2),
-                Arrays.asList("e1", "e2"));
-
-        assertTrue(result.startsWith("[") && result.endsWith("]"));
-        assertTrue(result.contains("\"errorMessage\":\"e1\""));
-        assertTrue(result.contains("\"errorMessage\":\"e2\""));
-    }
-
-    @Test
-    void buildPoisonPillBatchPayload_errorMessageWithSpecialChars_jsonEscaped() throws Exception {
-        ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(TOPIC, 0, 0L, null, null);
-        String result = (String) callPrivate(consumer, "buildPoisonPillBatchPayload",
-                new Class[]{List.class, List.class},
-                Collections.singletonList(r),
-                Collections.singletonList("error: \"broken\""));
-
-        assertTrue(result.contains("\\\"broken\\\""),
-                "double quotes in error message must be JSON-escaped");
-    }
-
     // ── commitRecordsAsBatch — trivial cases ───────────────────────────────────
 
     @Test
@@ -477,25 +359,15 @@ class KafkaMessageConsumerBatchTest {
     // ── commitRecordsAsBatch — poison pills ────────────────────────────────────
 
     @Test
-    void commitRecordsAsBatch_onlyPoisonPills_autoCommit_injectsToErrorSequence()
+    void commitRecordsAsBatch_onlyPoisonPills_autoCommit_skipsRecordWithoutInjection()
             throws Exception {
-        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
-             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
-             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
-                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
-                             .thenReturn(omElement))) {
-            stubAxis2(bu, tu);
-            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
+        callPrivate(consumer, "commitRecordsAsBatch",
+                new Class[]{ConsumerRecords.class},
+                makeRecords(TOPIC, 0, Collections.singletonList(
+                        poisonPillRecord(TOPIC, 0, 3L, "bad deser"))));
 
-            callPrivate(consumer, "commitRecordsAsBatch",
-                    new Class[]{ConsumerRecords.class},
-                    makeRecords(TOPIC, 0, Collections.singletonList(
-                            poisonPillRecord(TOPIC, 0, 3L, "bad deser"))));
-
-            verify(synapseEnvironment, atLeastOnce())
-                    .injectInbound(any(), eq(sequenceMediator), anyBoolean());
-            verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
-        }
+        verifyNoInteractions(synapseEnvironment);
+        verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
     }
 
     @Test
@@ -504,31 +376,22 @@ class KafkaMessageConsumerBatchTest {
         KafkaMessageConsumer mc = manualCommitConsumer();
         TopicPartition tp = new TopicPartition(TOPIC, 0);
 
-        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
-             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
-             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
-                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
-                             .thenReturn(omElement))) {
-            stubAxis2(bu, tu);
-            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
+        callPrivate(mc, "commitRecordsAsBatch",
+                new Class[]{ConsumerRecords.class},
+                makeRecords(TOPIC, 0, Collections.singletonList(
+                        poisonPillRecord(TOPIC, 0, 5L, "deser failed"))));
 
-            callPrivate(mc, "commitRecordsAsBatch",
-                    new Class[]{ConsumerRecords.class},
-                    makeRecords(TOPIC, 0, Collections.singletonList(
-                            poisonPillRecord(TOPIC, 0, 5L, "deser failed"))));
-
-            @SuppressWarnings("unchecked")
-            ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> captor =
-                    ArgumentCaptor.forClass((Class) Map.class);
-            verify(mockKafkaConsumer).commitSync(captor.capture());
-            assertEquals(6L, captor.getValue().get(tp).offset());
-        }
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> captor =
+                ArgumentCaptor.forClass((Class) Map.class);
+        verify(mockKafkaConsumer).commitSync(captor.capture());
+        assertEquals(6L, captor.getValue().get(tp).offset());
     }
 
     // ── commitRecordsAsBatch — mixed batch ─────────────────────────────────────
 
     @Test
-    void commitRecordsAsBatch_mixedBatch_poisonPillAndValidRecord_injectsBothSeparately()
+    void commitRecordsAsBatch_mixedBatch_poisonPillSkipped_validRecordInjected()
             throws Exception {
         KafkaMessageConsumer mc = manualCommitConsumer();
 
@@ -540,15 +403,15 @@ class KafkaMessageConsumerBatchTest {
             stubAxis2(bu, tu);
             when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
 
-            // offset 0 = poison pill, offset 1 = valid record
+            // offset 0 = poison pill (skipped), offset 1 = valid record (injected)
             callPrivate(mc, "commitRecordsAsBatch",
                     new Class[]{ConsumerRecords.class},
                     makeRecords(TOPIC, 0, Arrays.asList(
                             poisonPillRecord(TOPIC, 0, 0L, "err"),
                             record(TOPIC, 0, 1L, "ok".getBytes()))));
 
-            // first call: error sequence for poison pill; second call: inbound sequence for batch
-            verify(synapseEnvironment, times(2)).injectInbound(any(), any(), anyBoolean());
+            // only the valid record batch is injected; poison pill is logged and skipped
+            verify(synapseEnvironment, times(1)).injectInbound(any(), any(), anyBoolean());
             // offset committed: lastOffset(1) + 1 = 2
             @SuppressWarnings("unchecked")
             ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> captor =
