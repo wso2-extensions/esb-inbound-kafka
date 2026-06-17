@@ -556,7 +556,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
-            sb.append(escapeXml(new String(record.value(), StandardCharsets.UTF_8)));
+            sb.append(new String(record.value(), StandardCharsets.UTF_8));
         }
         sb.append("</messages>");
         return sb.toString();
@@ -568,9 +568,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
         return input.replace("&", "&amp;")
                 .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&apos;");
+                .replace(">", "&gt;");
     }
 
     private String escapeJson(String input) {
