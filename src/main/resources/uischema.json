@@ -363,7 +363,17 @@
               "inputType": "boolean",
               "defaultValue": false,
               "required": "false",
-              "helpTip": "When enabled, all records from a single poll are injected as a JSON array to the insequence in one invocation instead of one record at a time. Poison pill errors are also batched and injected once to the onError sequence."
+              "helpTip": "When enabled, all records from a single poll are injected as a batch to the insequence in one invocation instead of one record at a time."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "kafka.dlq.topic",
+              "displayName": "Dead Letter Queue (DLQ) Topic",
+              "inputType": "string",
+              "required": "false",
+              "helpTip": "Kafka topic to which poison pill records (records that fail deserialization) are forwarded. When configured, poison pills in a batch are published to this topic with provenance headers instead of being silently skipped."
             }
           },
           {

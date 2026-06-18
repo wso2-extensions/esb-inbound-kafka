@@ -161,6 +161,18 @@ public class KafkaConstants {
     // Batch processing
     public static final String BATCH_PROCESSING_ENABLED = "batch.processing.enabled";
     public static final String BATCH_PROCESSING_ENABLED_DEFAULT = "false";
+
+    // Dead Letter Queue (DLQ) configuration
+    public static final String DLQ_TOPIC = "kafka.dlq.topic";
+
+    // DLT provenance headers 
+    public static final String DLT_ORIGINAL_TOPIC = "kafka_dlt-original-topic";
+    public static final String DLT_ORIGINAL_PARTITION = "kafka_dlt-original-partition";
+    public static final String DLT_ORIGINAL_OFFSET = "kafka_dlt-original-offset";
+    public static final String DLT_ORIGINAL_TIMESTAMP = "kafka_dlt-original-timestamp";
+    public static final String DLT_EXCEPTION_MESSAGE = "kafka_dlt-exception-message";
+    public static final String DLT_EXCEPTION_CAUSE_MESSAGE = "kafka_dlt-exception-cause-message";
+
     // Error codes
     public static final String POISON_PILL_DETECTED = "700510";
     public static final String RETRY_EXHAUSTED = "700511";

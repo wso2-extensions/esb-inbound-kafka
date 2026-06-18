@@ -18,7 +18,6 @@
 package org.wso2.carbon.inbound.kafka;
 
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
-import org.apache.avro.generic.GenericData;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.builder.Builder;
 import org.apache.axis2.builder.BuilderUtil;
@@ -32,11 +31,16 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.wso2.carbon.inbound.kafka.deserializer.DeserializationException;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
@@ -72,6 +76,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
     private static final Log log = LogFactory.getLog(KafkaMessageConsumer.class);
 
+
     private KafkaConsumer<byte[], byte[]> consumer;
 
     private String bootstrapServersName;
@@ -91,6 +96,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String kafkaHeaderPrefix = "";
     private boolean isPaused = false;  // No need for volatile with synchronized access
     private final Object pauseLock = new Object();  // Dedicated lock for pause/resume operations
+    private String dlqTopic;
+    private KafkaProducer<byte[], byte[]> dlqProducer;
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -324,6 +331,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                                 + ", Partition No: " + record.partition()
                                 + ", Offset: " + record.offset()
                                 + " of Kafka Inbound Endpoint: " + name + ". The record will be skipped.");
+                        publishToDlq(record);
                     } else {
                         log.warn("A null record was passed and skipped in batch for Topic: " + record.topic()
                                 + ", Partition No: " + record.partition()
@@ -425,7 +433,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
             sb.append("<text xmlns=\"http://ws.apache.org/commons/ns/payload\">")
-                    .append(escapeXml(new String(record.value(), StandardCharsets.UTF_8)))
+                    .append(escapeXml(recordValueToString(record.value())))
                     .append("</text>");
         }
         sb.append("</messages>");
@@ -438,7 +446,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             if (i > 0) {
                 sb.append(",");
             }
-            sb.append(new String(records.get(i).value(), StandardCharsets.UTF_8));
+            sb.append(recordValueToString(records.get(i).value()));
         }
         sb.append("]");
         return sb.toString();
@@ -447,10 +455,17 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
-            sb.append(new String(record.value(), StandardCharsets.UTF_8));
+            sb.append(recordValueToString(record.value()));
         }
         sb.append("</messages>");
         return sb.toString();
+    }
+
+    private String recordValueToString(Object value) {
+        if (value instanceof byte[]) {
+            return new String((byte[]) value, StandardCharsets.UTF_8);
+        }
+        return value.toString();
     }
 
     private String escapeXml(String input) {
@@ -481,6 +496,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                         KafkaConstants.BATCH_PROCESSING_ENABLED_DEFAULT));
         if (properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX) != null) {
             kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
+        }
+        dlqTopic = properties.getProperty(KafkaConstants.DLQ_TOPIC);
+        if (!StringUtils.isEmpty(dlqTopic)) {
+            dlqProducer = initDlqProducer();
+            log.info("DLQ producer initialized for Kafka Inbound Endpoint: " + name
+                    + ". Poison pills will be published to topic: " + dlqTopic);
         }
     }
 
@@ -514,12 +535,134 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Build a KafkaProducer for publishing poison pills to the DLQ topic.
+     * Reuses bootstrap.servers and all security (SSL/SASL) settings from the consumer config.
+     */
+    private KafkaProducer<byte[], byte[]> initDlqProducer() {
+        Properties producerProps = new Properties();
+        kafkaProperties.stringPropertyNames().stream()
+                .filter(ProducerConfig.configNames()::contains)
+                .forEach(key -> producerProps.put(key, kafkaProperties.getProperty(key)));
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.ByteArraySerializer");
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.ByteArraySerializer");
+        return new KafkaProducer<>(producerProps);
+    }
+
+    /**
+     * Publish a poison pill record to the configured DLQ topic.
+     * The DLQ record carries the original raw bytes as its value and provenance headers
+     * that follow the Spring Kafka DLT naming convention.
+     *
+     * @param record the poison pill ConsumerRecord
+     */
+    private void publishToDlq(ConsumerRecord<byte[], byte[]> record) {
+        if (dlqProducer == null) {
+            log.warn("No DLQ topic configured for Kafka Inbound Endpoint: " + name
+                    + ". Poison pill at topic=" + record.topic()
+                    + " partition=" + record.partition()
+                    + " offset=" + record.offset() + " will be skipped.");
+            return;
+        }
+
+        byte[] originalBytes = null;
+        String exceptionMessage = "Unknown deserialization error";
+        String causeMessage = "";
+
+        DeserializationException ex = readDeserializationException(record);
+        if (ex != null) {
+            originalBytes = ex.getData();
+            exceptionMessage = ex.getMessage();
+            if (ex.getCause() != null && ex.getCause().getMessage() != null) {
+                causeMessage = ex.getCause().getMessage();
+            }
+        }
+
+        List<Header> dlqHeaders = buildDlqHeaders(record, exceptionMessage, causeMessage);
+        ProducerRecord<byte[], byte[]> dlqRecord = new ProducerRecord<>(
+                dlqTopic, null, record.key(), originalBytes, dlqHeaders);
+
+        try {
+            dlqProducer.send(dlqRecord).get();
+            log.info("Poison pill published to DLQ topic=" + dlqTopic
+                    + " from source topic=" + record.topic()
+                    + " partition=" + record.partition()
+                    + " offset=" + record.offset());
+        } catch (Exception e) {
+            log.error("Failed to publish poison pill to DLQ topic=" + dlqTopic
+                    + " from source topic=" + record.topic()
+                    + " offset=" + record.offset(), e);
+        }
+    }
+
+    /**
+     * Extracts the deserialization exception from the poison pill record headers.
+     * Checks the key deserializer exception header first, then the value deserializer exception header.
+     *
+     * @param record the poison pill ConsumerRecord
+     * @return the DeserializationException, or null if no exception header is present or it cannot be read
+     */
+    private DeserializationException readDeserializationException(ConsumerRecord<byte[], byte[]> record) {
+        Header exceptionHeader = record.headers().lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER);
+        if (exceptionHeader == null) {
+            exceptionHeader = record.headers().lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER);
+        }
+        if (exceptionHeader == null) {
+            return null;
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(exceptionHeader.value()))) {
+            return (DeserializationException) ois.readObject();
+        } catch (Exception e) {
+            log.warn("Could not read deserialization exception from poison pill header for topic="
+                    + record.topic() + " offset=" + record.offset(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Builds the header list for the DLQ record. Copies all original record headers except the internal
+     * deserialization exception headers, then appends provenance headers describing the origin of the
+     * poison pill and the deserialization failure.
+     *
+     * @param record           the original poison pill ConsumerRecord
+     * @param exceptionMessage the top-level deserialization error message
+     * @param causeMessage     the root cause message, or empty string if none
+     * @return the list of headers to attach to the DLQ ProducerRecord
+     */
+    private List<Header> buildDlqHeaders(ConsumerRecord<byte[], byte[]> record, String exceptionMessage,
+            String causeMessage) {
+        List<Header> dlqHeaders = new ArrayList<>();
+        for (Header h : record.headers()) {
+            if (!h.key().equals(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER)
+                    && !h.key().equals(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER)) {
+                dlqHeaders.add(h);
+            }
+        }
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_TOPIC,
+                record.topic().getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_PARTITION,
+                String.valueOf(record.partition()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_OFFSET,
+                String.valueOf(record.offset()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_TIMESTAMP,
+                String.valueOf(record.timestamp()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_EXCEPTION_MESSAGE,
+                exceptionMessage.getBytes(StandardCharsets.UTF_8)));
+        if (!causeMessage.isEmpty()) {
+            dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_EXCEPTION_CAUSE_MESSAGE,
+                    causeMessage.getBytes(StandardCharsets.UTF_8)));
+        }
+        return dlqHeaders;
+    }
+
+    /**
      * Set the Kafka Records to a MessageContext
      *
      * @param record A Kafka record
      * @return MessageContext A message context with the record header values
      */
-    private MessageContext populateMessageContext(ConsumerRecord record) {
+    private MessageContext populateMessageContext(ConsumerRecord<byte[], byte[]> record) {
         MessageContext msgCtx = createMessageContext();
         msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
         msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
@@ -530,10 +673,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
         msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-        if (record.value() instanceof GenericData.Record) {
-            GenericData.Record val = (GenericData.Record) record.value();
-            msgCtx.setProperty(KafkaConstants.KAFKA_SCHEMA_NAME, val.getSchema().getFullName());
-        }
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         // Set the kafka headers to the message context
@@ -789,6 +928,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (Exception e) {
             log.error("Error while shutdown the Kafka consumer " + name + " " + e.getMessage(), e);
+        }
+        if (dlqProducer != null) {
+            try {
+                dlqProducer.close();
+                if (log.isDebugEnabled()) {
+                    log.debug("The DLQ producer has been closed for " + name);
+                }
+            } catch (Exception e) {
+                log.error("Error while closing the DLQ producer for " + name, e);
+            }
         }
     }
 
