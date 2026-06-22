@@ -583,17 +583,18 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         ProducerRecord<byte[], byte[]> dlqRecord = new ProducerRecord<>(
                 dlqTopic, null, record.key(), originalBytes, dlqHeaders);
 
-        try {
-            dlqProducer.send(dlqRecord).get();
-            log.info("Poison pill published to DLQ topic=" + dlqTopic
-                    + " from source topic=" + record.topic()
-                    + " partition=" + record.partition()
-                    + " offset=" + record.offset());
-        } catch (Exception e) {
-            log.error("Failed to publish poison pill to DLQ topic=" + dlqTopic
-                    + " from source topic=" + record.topic()
-                    + " offset=" + record.offset(), e);
-        }
+        dlqProducer.send(dlqRecord, (metadata, exception) -> {
+            if (exception != null) {
+                log.error("Failed to publish poison pill to DLQ topic=" + dlqTopic
+                        + " from source topic=" + record.topic()
+                        + " offset=" + record.offset(), exception);
+            } else {
+                log.info("Poison pill published to DLQ topic=" + dlqTopic
+                        + " from source topic=" + record.topic()
+                        + " partition=" + record.partition()
+                        + " offset=" + record.offset());
+            }
+        });
     }
 
     /**
