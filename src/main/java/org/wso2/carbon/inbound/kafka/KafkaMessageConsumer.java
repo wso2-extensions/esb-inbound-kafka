@@ -498,7 +498,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
         }
         dlqTopic = properties.getProperty(KafkaConstants.DLQ_TOPIC);
-        if (!StringUtils.isEmpty(dlqTopic)) {
+        if (isBatchEnabled && !StringUtils.isEmpty(dlqTopic)) {
             dlqProducer = initDlqProducer();
             log.info("DLQ producer initialized for Kafka Inbound Endpoint: " + name
                     + ". Poison pills will be published to topic: " + dlqTopic);
