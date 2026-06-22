@@ -25,6 +25,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.synapse.config.SynapseConfiguration;
@@ -155,6 +156,7 @@ class KafkaMessageConsumerBatchTest {
         return new ConsumerRecords<>(map);
     }
 
+    /** Invokes a private method on {@code target} via reflection, bypassing access control. */
     private static Object callPrivate(Object target, String methodName,
             Class<?>[] argTypes, Object... args) throws Exception {
         Method m = target.getClass().getDeclaredMethod(methodName, argTypes);
@@ -162,18 +164,21 @@ class KafkaMessageConsumerBatchTest {
         return m.invoke(target, args);
     }
 
+    /** Sets a private field on {@code target} via reflection, bypassing access control. */
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field f = findField(target.getClass(), fieldName);
         f.setAccessible(true);
         f.set(target, value);
     }
 
+    /** Reads a private field from {@code target} via reflection, bypassing access control. */
     private static Object getField(Object target, String fieldName) throws Exception {
         Field f = findField(target.getClass(), fieldName);
         f.setAccessible(true);
         return f.get(target);
     }
 
+    /** Walks the class hierarchy to find a declared field by name, including inherited private fields. */
     private static Field findField(Class<?> c, String name) {
         while (c != null) {
             try { return c.getDeclaredField(name); } catch (NoSuchFieldException ignored) {}
@@ -217,6 +222,42 @@ class KafkaMessageConsumerBatchTest {
         String result = (String) callPrivate(consumer, "buildBatchPayload",
                 new Class[]{List.class}, Collections.emptyList());
         assertEquals("[]", result);
+    }
+
+    @Test
+    void buildBatchPayload_applicationXml_wrapsRecordsInMessagesRoot() throws Exception {
+        setField(consumer, "contentType", "application/xml");
+        List<ConsumerRecord<byte[], byte[]>> list = Arrays.asList(
+                record(TOPIC, 0, 0L, "<item>one</item>".getBytes()),
+                record(TOPIC, 0, 1L, "<item>two</item>".getBytes()));
+        String result = (String) callPrivate(consumer, "buildBatchPayload",
+                new Class[]{List.class}, list);
+        assertEquals("<messages><item>one</item><item>two</item></messages>", result);
+    }
+
+    @Test
+    void buildBatchPayload_textXml_wrapsRecordsInMessagesRoot() throws Exception {
+        setField(consumer, "contentType", "text/xml");
+        ConsumerRecord<byte[], byte[]> r = record(TOPIC, 0, 0L, "<item>one</item>".getBytes());
+        String result = (String) callPrivate(consumer, "buildBatchPayload",
+                new Class[]{List.class}, Collections.singletonList(r));
+        assertEquals("<messages><item>one</item></messages>", result);
+    }
+
+    @Test
+    void buildBatchPayload_textPlain_wrapsInTextElementsAndEscapesXml() throws Exception {
+        setField(consumer, "contentType", "text/plain");
+        List<ConsumerRecord<byte[], byte[]>> list = Arrays.asList(
+                record(TOPIC, 0, 0L, "hello".getBytes()),
+                record(TOPIC, 0, 1L, "a<b>&c".getBytes()));
+        String result = (String) callPrivate(consumer, "buildBatchPayload",
+                new Class[]{List.class}, list);
+        assertEquals(
+                "<messages>" +
+                "<text xmlns=\"http://ws.apache.org/commons/ns/payload\">hello</text>" +
+                "<text xmlns=\"http://ws.apache.org/commons/ns/payload\">a&lt;b&gt;&amp;c</text>" +
+                "</messages>",
+                result);
     }
 
     // ── commitRecordsAsBatch — trivial cases ───────────────────────────────────
@@ -418,6 +459,278 @@ class KafkaMessageConsumerBatchTest {
                     ArgumentCaptor.forClass((Class) Map.class);
             verify(mockKafkaConsumer).commitSync(captor.capture());
             assertEquals(2L, captor.getValue().get(new TopicPartition(TOPIC, 0)).offset());
+        }
+    }
+
+    // ── commitRecordsAsBatch — auto-commit + failure ───────────────────────────
+
+    @Test
+    void commitRecordsAsBatch_validRecords_autoCommit_failure_noSeekNoCommit() throws Exception {
+        // With auto-commit, a failed injection is silently ignored — no seek, no manual commit.
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(consumer, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            verify(mockKafkaConsumer, never()).seek(any(), anyLong());
+            verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
+        }
+    }
+
+    // ── commitRecordsAsBatch — multi-partition ─────────────────────────────────
+
+    @Test
+    void commitRecordsAsBatch_multiPartition_manualCommit_success_commitsAllPartitions()
+            throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        TopicPartition tp0 = new TopicPartition(TOPIC, 0);
+        TopicPartition tp1 = new TopicPartition(TOPIC, 1);
+
+        Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> partitionMap = new HashMap<>();
+        partitionMap.put(tp0, Arrays.asList(
+                record(TOPIC, 0, 10L, "a".getBytes()),
+                record(TOPIC, 0, 11L, "b".getBytes())));
+        partitionMap.put(tp1, Arrays.asList(
+                record(TOPIC, 1, 20L, "c".getBytes()),
+                record(TOPIC, 1, 21L, "d".getBytes())));
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class}, new ConsumerRecords<>(partitionMap));
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> captor =
+                    ArgumentCaptor.forClass((Class) Map.class);
+            verify(mockKafkaConsumer).commitSync(captor.capture());
+            Map<TopicPartition, OffsetAndMetadata> committed = captor.getValue();
+            assertEquals(12L, committed.get(tp0).offset(), "partition 0: lastOffset(11)+1");
+            assertEquals(22L, committed.get(tp1).offset(), "partition 1: lastOffset(21)+1");
+        }
+    }
+
+    @Test
+    void commitRecordsAsBatch_multiPartition_manualCommit_failure_seeksAllPartitionsToFirstOffset()
+            throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        TopicPartition tp0 = new TopicPartition(TOPIC, 0);
+        TopicPartition tp1 = new TopicPartition(TOPIC, 1);
+
+        Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> partitionMap = new HashMap<>();
+        partitionMap.put(tp0, Arrays.asList(
+                record(TOPIC, 0, 10L, "a".getBytes()),
+                record(TOPIC, 0, 11L, "b".getBytes())));
+        partitionMap.put(tp1, Arrays.asList(
+                record(TOPIC, 1, 20L, "c".getBytes()),
+                record(TOPIC, 1, 21L, "d".getBytes())));
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class}, new ConsumerRecords<>(partitionMap));
+
+            verify(mockKafkaConsumer).seek(tp0, 10L);
+            verify(mockKafkaConsumer).seek(tp1, 20L);
+            verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
+        }
+    }
+
+    // ── commitRecordsAsBatch — retryCounter lifecycle ──────────────────────────
+
+    @Test
+    void commitRecordsAsBatch_failure_incrementsRetryCounter() throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            assertEquals(1, (int) getField(mc, "retryCounter"));
+        }
+    }
+
+    @Test
+    void commitRecordsAsBatch_successAfterPreviousFailures_resetsRetryCounterToZero()
+            throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        setField(mc, "retryCounter", 2);
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            assertEquals(0, (int) getField(mc, "retryCounter"));
+        }
+    }
+
+    @Test
+    void commitRecordsAsBatch_retryExhaustion_resetsRetryCounterToZero() throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        setField(mc, "retryCounter", 3);
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            assertEquals(0, (int) getField(mc, "retryCounter"));
+        }
+    }
+
+    // ── commitRecordsAsBatch — failureRetryCount edge values ───────────────────
+
+    @Test
+    void commitRecordsAsBatch_infiniteRetryCount_alwaysSeeksNeverCommits() throws Exception {
+        // failureRetryCount=-1 is the default when the property is absent
+        Properties p = baseProps(true, false);
+        p.setProperty(KafkaConstants.ENABLE_AUTO_COMMIT, "false");
+        KafkaMessageConsumer mc = new KafkaMessageConsumer(p, ENDPOINT_NAME,
+                synapseEnvironment, 1000L, INBOUND_SEQ, ERROR_SEQ, false, true);
+        setField(mc, "consumer", mockKafkaConsumer);
+        setField(mc, "retryCounter", 100);  // large value; infinite mode never exhausts
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            verify(mockKafkaConsumer).seek(new TopicPartition(TOPIC, 0), 5L);
+            verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
+        }
+    }
+
+    @Test
+    void commitRecordsAsBatch_zeroRetryCount_exhaustsImmediatelyOnFirstFailure() throws Exception {
+        Properties p = baseProps(true, false);
+        p.setProperty(KafkaConstants.ENABLE_AUTO_COMMIT, "false");
+        p.setProperty(KafkaConstants.FAILURE_RETRY_COUNT, "0");
+        KafkaMessageConsumer mc = new KafkaMessageConsumer(p, ENDPOINT_NAME,
+                synapseEnvironment, 1000L, INBOUND_SEQ, ERROR_SEQ, false, true);
+        setField(mc, "consumer", mockKafkaConsumer);
+        TopicPartition tp = new TopicPartition(TOPIC, 0);
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Collections.singletonList(
+                            record(TOPIC, 0, 5L, "msg".getBytes()))));
+
+            verify(mockKafkaConsumer, never()).seek(any(), anyLong());
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> captor =
+                    ArgumentCaptor.forClass((Class) Map.class);
+            verify(mockKafkaConsumer).commitSync(captor.capture());
+            assertEquals(6L, captor.getValue().get(tp).offset());
+            // batch injection + error injection = 2 calls
+            verify(synapseEnvironment, times(2)).injectInbound(any(), any(), anyBoolean());
+        }
+    }
+
+    // ── commitRecordsAsBatch — DLQ ─────────────────────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitRecordsAsBatch_poisonPill_dlqConfigured_sendsRecordToDlq() throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        KafkaProducer<byte[], byte[]> mockDlqProducer = mock(KafkaProducer.class);
+        setField(mc, "dlqTopic", "dlq-topic");
+        setField(mc, "dlqProducer", mockDlqProducer);
+
+        callPrivate(mc, "commitRecordsAsBatch",
+                new Class[]{ConsumerRecords.class},
+                makeRecords(TOPIC, 0, Collections.singletonList(
+                        poisonPillRecord(TOPIC, 0, 3L, "deser error"))));
+
+        verify(mockDlqProducer).send(any(), any());
+    }
+
+    // ── commitRecordsAsBatch — null + valid mix, failure seek ──────────────────
+
+    @Test
+    void commitRecordsAsBatch_nullBeforeValidRecord_failure_seeksToFirstValidOffset()
+            throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        TopicPartition tp = new TopicPartition(TOPIC, 0);
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            // offset 5: null (skipped), offset 7: first valid record
+            callPrivate(mc, "commitRecordsAsBatch",
+                    new Class[]{ConsumerRecords.class},
+                    makeRecords(TOPIC, 0, Arrays.asList(
+                            nullValueRecord(TOPIC, 0, 5L),
+                            record(TOPIC, 0, 7L, "msg".getBytes()))));
+
+            // seek must land on the first valid record's offset, not the null record's offset
+            verify(mockKafkaConsumer).seek(tp, 7L);
+            verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
         }
     }
 
