@@ -367,8 +367,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
                     try {
                         if (log.isDebugEnabled()) {
-                            log.debug("Failed Kafka batch will be retried after max(poll_interval,"
-                                    + " failure_retry_interval): "
+                            log.debug("Failed Kafka batch will be retried after max(interval,"
+                                    + " failure.retry.interval): "
                                     + Long.max(failureRetryInterval, scanInterval) + "ms.");
                         }
                         Thread.sleep(this.failureRetryInterval);
