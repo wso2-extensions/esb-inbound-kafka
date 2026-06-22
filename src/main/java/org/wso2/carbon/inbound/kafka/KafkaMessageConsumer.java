@@ -613,7 +613,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             return null;
         }
         try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(exceptionHeader.value()))) {
-            return (DeserializationException) ois.readObject();
+            Object obj = ois.readObject();
+            if (obj instanceof DeserializationException) {
+                return (DeserializationException) obj;
+            }
+            log.warn("Unexpected type in deserialization exception header: " + obj.getClass().getName()
+                    + " for topic=" + record.topic() + " offset=" + record.offset());
+            return null;
         } catch (Exception e) {
             log.warn("Could not read deserialization exception from poison pill header for topic="
                     + record.topic() + " offset=" + record.offset(), e);
