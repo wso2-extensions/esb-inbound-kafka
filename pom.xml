@@ -55,6 +55,18 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
             <artifactId>kafka-avro-serializer</artifactId>
             <version>${confluent.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.wso2.orbit.commons-text</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>${commons-text.orbit.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wso2.orbit.org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.orbit.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- Carbon Mediation -->
         <dependency>
             <groupId>org.wso2.carbon.mediation</groupId>
@@ -227,5 +239,7 @@ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
         <carbon.mediation.version>4.4.10</carbon.mediation.version>
         <kafka.version>3.3.1</kafka.version>
         <confluent.version>7.4.0</confluent.version>
+        <commons-text.orbit.version>1.13.1.wso2v1</commons-text.orbit.version>
+        <commons-lang3.orbit.version>3.20.0.wso2v1</commons-lang3.orbit.version>
     </properties>
 </project>

@@ -25,6 +25,7 @@ import org.apache.axis2.builder.SOAPBuilder;
 import org.apache.axis2.transport.TransportUtils;
 import org.apache.commons.io.input.AutoCloseInputStream;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -433,7 +434,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         StringBuilder sb = new StringBuilder("<messages>");
         for (ConsumerRecord<byte[], byte[]> record : records) {
             sb.append("<text xmlns=\"http://ws.apache.org/commons/ns/payload\">")
-                    .append(escapeXml(recordValueToString(record.value())))
+                    .append(StringEscapeUtils.escapeXml10(recordValueToString(record.value())))
                     .append("</text>");
         }
         sb.append("</messages>");
@@ -466,15 +467,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             return new String((byte[]) value, StandardCharsets.UTF_8);
         }
         return value.toString();
-    }
-
-    private String escapeXml(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
     }
 
     private MessageContext createBatchMessageContext() {
