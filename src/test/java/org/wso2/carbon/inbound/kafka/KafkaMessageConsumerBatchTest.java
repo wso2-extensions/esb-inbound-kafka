@@ -705,6 +705,100 @@ class KafkaMessageConsumerBatchTest {
         verify(mockDlqProducer).send(any(), any());
     }
 
+    // ── commitRecordsAsBatch — interleaved poison pill deduplication ──────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitRecordsAsBatch_interleavedPoisonPill_onRetry_notRepublishedToDlq() throws Exception {
+        // [offset 10: valid, offset 11: poison pill, offset 12: valid]
+        // First call fails → seek back to 10. Second call presents the same records.
+        // The poison pill at 11 must be sent to the DLQ exactly once.
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        KafkaProducer<byte[], byte[]> mockDlqProducer = mock(KafkaProducer.class);
+        setField(mc, "dlqTopic", "dlq-topic");
+        setField(mc, "dlqProducer", mockDlqProducer);
+
+        ConsumerRecords<byte[], byte[]> batch = makeRecords(TOPIC, 0, Arrays.asList(
+                record(TOPIC, 0, 10L, "a".getBytes()),
+                poisonPillRecord(TOPIC, 0, 11L, "bad deser"),
+                record(TOPIC, 0, 12L, "b".getBytes())));
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch", new Class[]{ConsumerRecords.class}, batch);
+            callPrivate(mc, "commitRecordsAsBatch", new Class[]{ConsumerRecords.class}, batch);
+
+            verify(mockDlqProducer, times(1)).send(any(), any());
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitRecordsAsBatch_poisonPillWithValidRecords_onSuccess_dlqPublishedOffsetsCleared()
+            throws Exception {
+        // After a successful batch commit the tracking set must be cleared so the
+        // next independent batch can re-use offset numbers without false dedup.
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        KafkaProducer<byte[], byte[]> mockDlqProducer = mock(KafkaProducer.class);
+        setField(mc, "dlqTopic", "dlq-topic");
+        setField(mc, "dlqProducer", mockDlqProducer);
+
+        ConsumerRecords<byte[], byte[]> batch = makeRecords(TOPIC, 0, Arrays.asList(
+                poisonPillRecord(TOPIC, 0, 5L, "bad deser"),
+                record(TOPIC, 0, 6L, "ok".getBytes())));
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(true);
+
+            callPrivate(mc, "commitRecordsAsBatch", new Class[]{ConsumerRecords.class}, batch);
+
+            Map<?, ?> tracking = (Map<?, ?>) getField(mc, "dlqPublishedOffsets");
+            assertTrue(tracking.isEmpty(),
+                    "dlqPublishedOffsets must be cleared after a successful commit");
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitRecordsAsBatch_poisonPillWithValidRecords_onRetryExhaustion_dlqPublishedOffsetsCleared()
+            throws Exception {
+        KafkaMessageConsumer mc = manualCommitConsumer();
+        setField(mc, "retryCounter", 3); // already at failureRetryCount=3
+        KafkaProducer<byte[], byte[]> mockDlqProducer = mock(KafkaProducer.class);
+        setField(mc, "dlqTopic", "dlq-topic");
+        setField(mc, "dlqProducer", mockDlqProducer);
+
+        ConsumerRecords<byte[], byte[]> batch = makeRecords(TOPIC, 0, Arrays.asList(
+                poisonPillRecord(TOPIC, 0, 5L, "bad deser"),
+                record(TOPIC, 0, 6L, "ok".getBytes())));
+
+        try (MockedStatic<BuilderUtil> bu = mockStatic(BuilderUtil.class);
+             MockedStatic<TransportUtils> tu = mockStatic(TransportUtils.class);
+             MockedConstruction<SOAPBuilder> ignored = mockConstruction(SOAPBuilder.class,
+                     (m, ctx) -> when(m.processDocument(any(), anyString(), any()))
+                             .thenReturn(omElement))) {
+            stubAxis2(bu, tu);
+            when(synapseEnvironment.injectInbound(any(), any(), anyBoolean())).thenReturn(false);
+
+            callPrivate(mc, "commitRecordsAsBatch", new Class[]{ConsumerRecords.class}, batch);
+
+            Map<?, ?> tracking = (Map<?, ?>) getField(mc, "dlqPublishedOffsets");
+            assertTrue(tracking.isEmpty(),
+                    "dlqPublishedOffsets must be cleared after retry exhaustion commit");
+        }
+    }
+
     // ── commitRecordsAsBatch — null + valid mix, failure seek ──────────────────
 
     @Test

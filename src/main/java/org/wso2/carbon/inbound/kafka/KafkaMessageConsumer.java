@@ -62,9 +62,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -99,6 +101,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private final Object pauseLock = new Object();  // Dedicated lock for pause/resume operations
     private String dlqTopic;
     private KafkaProducer<byte[], byte[]> dlqProducer;
+    private final Map<TopicPartition, Set<Long>> dlqPublishedOffsets = new HashMap<>();
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -328,11 +331,18 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 lastOffsets.put(partition, record.offset());
                 if (record.value() == null) {
                     if (isPoisonPill(record)) {
-                        log.warn("A poison pill was detected in batch for Topic: " + record.topic()
-                                + ", Partition No: " + record.partition()
-                                + ", Offset: " + record.offset()
-                                + " of Kafka Inbound Endpoint: " + name + ". The record will be skipped.");
-                        publishToDlq(record);
+                        TopicPartition tp = new TopicPartition(record.topic(), record.partition());
+                        if (dlqPublishedOffsets.computeIfAbsent(tp, k -> new HashSet<>()).add(record.offset())) {
+                            log.warn("A poison pill was detected in batch for Topic: " + record.topic()
+                                    + ", Partition No: " + record.partition()
+                                    + ", Offset: " + record.offset()
+                                    + " of Kafka Inbound Endpoint: " + name + ". The record will be skipped.");
+                            publishToDlq(record);
+                        } else {
+                            log.warn("Skipping duplicate DLQ publish for poison pill at Topic: " + record.topic()
+                                    + ", Partition No: " + record.partition()
+                                    + ", Offset: " + record.offset());
+                        }
                     } else {
                         log.warn("A null record was passed and skipped in batch for Topic: " + record.topic()
                                 + ", Partition No: " + record.partition()
@@ -349,6 +359,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             if (isDisableAutoCommit) {
                 commitOffsets(lastOffsets, 1);
             }
+            dlqPublishedOffsets.clear();
             return;
         }
 
@@ -364,6 +375,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             if (isConsumed) {
                 retryCounter = 0;
                 commitOffsets(lastOffsets, 1);
+                dlqPublishedOffsets.clear();
             } else {
                 if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
                     try {
@@ -387,6 +399,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 } else {
                     log.warn("The batch offset set to the next record since failure retry count exceeded.");
                     commitOffsets(lastOffsets, 1);
+                    dlqPublishedOffsets.clear();
                     retryCounter = 0;
                     injectErrorMessage("Failed to successfully mediate the batch message to/in the sequence: "
                             + this.injectingSeq + " of Kafka Inbound Endpoint: " + name + ", even after "
