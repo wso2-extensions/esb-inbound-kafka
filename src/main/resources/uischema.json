@@ -373,7 +373,8 @@
               "displayName": "Dead Letter Queue (DLQ) Topic",
               "inputType": "string",
               "required": "false",
-              "helpTip": "Kafka topic to which poison pill records (records that fail deserialization) are forwarded. When configured, poison pills in a batch are published to this topic with provenance headers instead of being silently skipped."
+              "helpTip": "Kafka topic to which poison pill records are forwarded. When configured, poison pills in a batch are published to this topic with provenance headers.",
+              "enableCondition": [{"batch.processing.enabled": "true"}]
             }
           },
           {
