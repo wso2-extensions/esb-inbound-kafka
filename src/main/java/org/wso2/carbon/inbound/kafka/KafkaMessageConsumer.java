@@ -322,12 +322,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         }
 
         List<ConsumerRecord<byte[], byte[]>> validRecords = new ArrayList<>();
-        Map<TopicPartition, Long> firstOffsets = new HashMap<>();
-        Map<TopicPartition, Long> lastOffsets = new HashMap<>();
+        Map<TopicPartition, Long> firstValidOffsetsByPartition = new HashMap<>();
+        Map<TopicPartition, Long> lastPolledOffsetsByPartition = new HashMap<>();
 
         for (TopicPartition partition : records.partitions()) {
             for (ConsumerRecord<byte[], byte[]> record : records.records(partition)) {
-                lastOffsets.put(partition, record.offset());
+                lastPolledOffsetsByPartition.put(partition, record.offset());
                 if (record.value() == null) {
                     if (isPoisonPill(record)) {
                         TopicPartition tp = new TopicPartition(record.topic(), record.partition());
@@ -348,7 +348,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                                 + ", Offset: " + record.offset());
                     }
                 } else {
-                    firstOffsets.putIfAbsent(partition, record.offset());
+                    firstValidOffsetsByPartition.putIfAbsent(partition, record.offset());
                     validRecords.add(record);
                 }
             }
@@ -356,7 +356,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
         if (validRecords.isEmpty()) {
             if (isDisableAutoCommit) {
-                commitOffsets(lastOffsets, 1);
+                commitOffsets(lastPolledOffsetsByPartition, 1);
             }
             dlqPublishedOffsets.clear();
             return;
@@ -373,7 +373,7 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         if (isDisableAutoCommit) {
             if (isConsumed) {
                 retryCounter = 0;
-                commitOffsets(lastOffsets, 1);
+                commitOffsets(lastPolledOffsetsByPartition, 1);
                 dlqPublishedOffsets.clear();
             } else {
                 if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
@@ -392,12 +392,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                     retryCounter++;
                 }
                 if (retryCounter < failureRetryCount || failureRetryCount < 0) {
-                    for (Map.Entry<TopicPartition, Long> entry : firstOffsets.entrySet()) {
+                    for (Map.Entry<TopicPartition, Long> entry : firstValidOffsetsByPartition.entrySet()) {
                         consumer.seek(entry.getKey(), entry.getValue());
                     }
                 } else {
                     log.warn("The batch offset set to the next record since failure retry count exceeded.");
-                    commitOffsets(lastOffsets, 1);
+                    commitOffsets(lastPolledOffsetsByPartition, 1);
                     dlqPublishedOffsets.clear();
                     retryCounter = 0;
                     injectErrorMessage("Failed to successfully mediate the batch message to/in the sequence: "
