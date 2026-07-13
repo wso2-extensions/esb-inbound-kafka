@@ -443,6 +443,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return KafkaConstants.CONTENT_TYPE_APPLICATION_XML;
     }
 
+    /**
+     * Build a batch payload by wrapping each record's raw value, XML-escaped, in a text element
+     * inside the batch root element. Used when the content type is neither JSON nor XML.
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as an XML string with escaped text elements
+     */
     private String buildBatchTextPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
         for (ConsumerRecord<byte[], byte[]> record : records) {
@@ -454,6 +461,12 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return sb.toString();
     }
 
+    /**
+     * Build a JSON array payload by concatenating each record's raw value as a JSON element.
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as a JSON array string
+     */
     private String buildBatchJsonPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < records.size(); i++) {
@@ -466,6 +479,14 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return sb.toString();
     }
 
+    /**
+     * Build an XML batch payload by concatenating each record's raw value, unescaped, inside the
+     * batch root element. Used when the content type is XML, so each record value is expected to
+     * already be well-formed XML.
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as an XML string
+     */
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
         for (ConsumerRecord<byte[], byte[]> record : records) {
@@ -475,6 +496,13 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         return sb.toString();
     }
 
+    /**
+     * Convert a record value to its string representation. Byte arrays are decoded as UTF-8;
+     * any other type falls back to {@code toString()}.
+     *
+     * @param value the record value to convert
+     * @return the string representation of the value
+     */
     private String recordValueToString(Object value) {
         if (value instanceof byte[]) {
             return new String((byte[]) value, StandardCharsets.UTF_8);
