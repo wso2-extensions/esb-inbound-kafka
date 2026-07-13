@@ -79,7 +79,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
     private static final Log log = LogFactory.getLog(KafkaMessageConsumer.class);
 
-
     private KafkaConsumer<byte[], byte[]> consumer;
 
     private String bootstrapServersName;
@@ -426,10 +425,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      */
     private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         String type = contentType != null ? contentType.split(";")[0].trim() : "";
-        if ("application/xml".equalsIgnoreCase(type) || "text/xml".equalsIgnoreCase(type)) {
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_XML.equalsIgnoreCase(type)
+                || KafkaConstants.CONTENT_TYPE_TEXT_XML.equalsIgnoreCase(type)) {
             return buildBatchXmlPayload(records);
         }
-        if ("application/json".equalsIgnoreCase(type)) {
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_JSON.equalsIgnoreCase(type)) {
             return buildBatchJsonPayload(records);
         }
         return buildBatchTextPayload(records);
@@ -437,20 +437,20 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
     private String getBatchContentType() {
         String type = contentType != null ? contentType.split(";")[0].trim() : "";
-        if ("application/json".equalsIgnoreCase(type)) {
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_JSON.equalsIgnoreCase(type)) {
             return contentType;
         }
-        return "application/xml";
+        return KafkaConstants.CONTENT_TYPE_APPLICATION_XML;
     }
 
     private String buildBatchTextPayload(List<ConsumerRecord<byte[], byte[]>> records) {
-        StringBuilder sb = new StringBuilder("<messages>");
+        StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
         for (ConsumerRecord<byte[], byte[]> record : records) {
-            sb.append("<text xmlns=\"http://ws.apache.org/commons/ns/payload\">")
+            sb.append(KafkaConstants.BATCH_TEXT_ELEMENT_START_TAG)
                     .append(StringEscapeUtils.escapeXml10(recordValueToString(record.value())))
-                    .append("</text>");
+                    .append(KafkaConstants.BATCH_TEXT_ELEMENT_END_TAG);
         }
-        sb.append("</messages>");
+        sb.append(KafkaConstants.BATCH_XML_ROOT_END_TAG);
         return sb.toString();
     }
 
@@ -467,11 +467,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
-        StringBuilder sb = new StringBuilder("<messages>");
+        StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
         for (ConsumerRecord<byte[], byte[]> record : records) {
             sb.append(recordValueToString(record.value()));
         }
-        sb.append("</messages>");
+        sb.append(KafkaConstants.BATCH_XML_ROOT_END_TAG);
         return sb.toString();
     }
 
@@ -549,9 +549,9 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
                 .filter(ProducerConfig.configNames()::contains)
                 .forEach(key -> producerProps.put(key, kafkaProperties.getProperty(key)));
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-                "org.apache.kafka.common.serialization.ByteArraySerializer");
+                KafkaConstants.BYTE_ARRAY_SERIALIZER_CLASS);
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-                "org.apache.kafka.common.serialization.ByteArraySerializer");
+                KafkaConstants.BYTE_ARRAY_SERIALIZER_CLASS);
         return new KafkaProducer<>(producerProps);
     }
 
