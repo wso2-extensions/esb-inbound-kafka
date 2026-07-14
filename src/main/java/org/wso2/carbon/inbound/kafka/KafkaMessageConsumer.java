@@ -420,8 +420,8 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
-     * Build a JSON array string from the given records. Each element is the raw record value,
-     * matching the payload format used in single-record mode.
+     * Build the batch payload for the given records, delegating to {@link #buildBatchXmlPayload},
+     * {@link #buildBatchJsonPayload}, or {@link #buildBatchTextPayload} based on the content type.
      */
     private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
         String type = contentType != null ? contentType.split(";")[0].trim() : "";
@@ -447,6 +447,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * Build a batch payload by wrapping each record's raw value, XML-escaped, in a text element
      * inside the batch root element. Used when the content type is neither JSON nor XML.
      *
+     * <p>Sample output for records with values {@code hello} and {@code world}:
+     * <pre>{@code
+     * <messages><text xmlns="http://ws.apache.org/commons/ns/payload">hello</text><text xmlns="http://ws.apache.org/commons/ns/payload">world</text></messages>
+     * }</pre>
+     *
      * @param records records to include in the batch
      * @return the batch payload as an XML string with escaped text elements
      */
@@ -463,6 +468,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
     /**
      * Build a JSON array payload by concatenating each record's raw value as a JSON element.
+     *
+     * <p>Sample output for records with values {@code {"id":1}} and {@code {"id":2}}:
+     * <pre>{@code
+     * [{"id":1},{"id":2}]
+     * }</pre>
      *
      * @param records records to include in the batch
      * @return the batch payload as a JSON array string
@@ -483,6 +493,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      * Build an XML batch payload by concatenating each record's raw value, unescaped, inside the
      * batch root element. Used when the content type is XML, so each record value is expected to
      * already be well-formed XML.
+     *
+     * <p>Sample output for records with values {@code <order>1</order>} and {@code <order>2</order>}:
+     * <pre>{@code
+     * <messages><order>1</order><order>2</order></messages>
+     * }</pre>
      *
      * @param records records to include in the batch
      * @return the batch payload as an XML string
