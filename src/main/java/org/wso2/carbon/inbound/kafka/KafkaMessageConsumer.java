@@ -18,7 +18,6 @@
 package org.wso2.carbon.inbound.kafka;
 
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
-import org.apache.avro.generic.GenericData;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.builder.Builder;
 import org.apache.axis2.builder.BuilderUtil;
@@ -26,17 +25,23 @@ import org.apache.axis2.builder.SOAPBuilder;
 import org.apache.axis2.transport.TransportUtils;
 import org.apache.commons.io.input.AutoCloseInputStream;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.wso2.carbon.inbound.kafka.deserializer.DeserializationException;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
@@ -50,13 +55,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -81,12 +91,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     private Properties kafkaProperties;
     private boolean isRegexPattern = false;
     private boolean isDisableAutoCommit;
+    private boolean isBatchEnabled = false;
     private int failureRetryCount;
     private int retryCounter = 0;
     private long failureRetryInterval = -1;
     private String kafkaHeaderPrefix = "";
     private boolean isPaused = false;  // No need for volatile with synchronized access
     private final Object pauseLock = new Object();  // Dedicated lock for pause/resume operations
+    private String dlqTopic;
+    private KafkaProducer<byte[], byte[]> dlqProducer;
+    private final Map<TopicPartition, Set<Long>> dlqPublishedOffsets = new HashMap<>();
 
     public KafkaMessageConsumer(Properties properties, String name, SynapseEnvironment synapseEnvironment,
                                 long scanInterval, String injectingSeq, String onErrorSeq, boolean coordination,
@@ -115,7 +129,11 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
 
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.of(Long.parseLong(pollTimeout),
                     ChronoUnit.MILLIS));
-            commitRecords(records);
+            if (isBatchEnabled) {
+                commitRecordsAsBatch(records);
+            } else {
+                commitRecords(records);
+            }
         } catch (WakeupException ex) {
             log.error("Error while wakeup the consumer " + consumer);
             consumer.close();
@@ -290,14 +308,248 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Inject all records from a single poll as a single JSON array message to the insequence.
+     * Poison pills and null-value records are skipped individually before the batch is assembled.
+     * With manual commit (enable.auto.commit=false), the entire batch is committed on success or
+     * seeked back to each partition's first offset on failure; retry logic mirrors the per-record
+     * behaviour.
+     *
+     * @param records ConsumerRecords from a single poll
+     */
+    private void commitRecordsAsBatch(ConsumerRecords<byte[], byte[]> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+
+        List<ConsumerRecord<byte[], byte[]>> validRecords = new ArrayList<>();
+        Map<TopicPartition, Long> firstValidOffsetsByPartition = new HashMap<>();
+        Map<TopicPartition, Long> lastPolledOffsetsByPartition = new HashMap<>();
+
+        for (TopicPartition partition : records.partitions()) {
+            for (ConsumerRecord<byte[], byte[]> record : records.records(partition)) {
+                lastPolledOffsetsByPartition.put(partition, record.offset());
+                if (record.value() == null) {
+                    if (isPoisonPill(record)) {
+                        TopicPartition tp = new TopicPartition(record.topic(), record.partition());
+                        if (dlqPublishedOffsets.computeIfAbsent(tp, k -> new HashSet<>()).add(record.offset())) {
+                            log.warn("A poison pill was detected in batch for Topic: " + record.topic()
+                                    + ", Partition No: " + record.partition()
+                                    + ", Offset: " + record.offset()
+                                    + " of Kafka Inbound Endpoint: " + name + ". The record will be skipped.");
+                            publishToDlq(record);
+                        } else {
+                            log.warn("Skipping duplicate DLQ publish for poison pill at Topic: " + record.topic()
+                                    + ", Partition No: " + record.partition()
+                                    + ", Offset: " + record.offset());
+                        }
+                    } else {
+                        log.warn("A null record was passed and skipped in batch for Topic: " + record.topic()
+                                + ", Partition No: " + record.partition()
+                                + ", Offset: " + record.offset());
+                    }
+                } else {
+                    firstValidOffsetsByPartition.putIfAbsent(partition, record.offset());
+                    validRecords.add(record);
+                }
+            }
+        }
+
+        if (validRecords.isEmpty()) {
+            if (isDisableAutoCommit) {
+                commitOffsets(lastPolledOffsetsByPartition, 1);
+            }
+            dlqPublishedOffsets.clear();
+            return;
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("Injecting a batch of " + validRecords.size() + " Kafka messages for inbound mediation."
+                    + " Endpoint: " + name);
+        }
+
+        MessageContext msgCtx = createBatchMessageContext();
+        boolean isConsumed = injectMessage(buildBatchPayload(validRecords), getBatchContentType(), msgCtx);
+
+        if (isDisableAutoCommit) {
+            if (isConsumed) {
+                retryCounter = 0;
+                commitOffsets(lastPolledOffsetsByPartition, 1);
+                dlqPublishedOffsets.clear();
+            } else {
+                if (failureRetryInterval > 0 && (retryCounter < failureRetryCount || failureRetryCount < 0)) {
+                    try {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Failed Kafka batch will be retried after max(interval,"
+                                    + " failure.retry.interval): "
+                                    + Long.max(failureRetryInterval, scanInterval) + "ms.");
+                        }
+                        Thread.sleep(this.failureRetryInterval);
+                    } catch (InterruptedException e) {
+                        log.error("The interval for retrying batch failures was interrupted while waiting.");
+                    }
+                }
+                if (failureRetryCount > 0) {
+                    retryCounter++;
+                }
+                if (retryCounter < failureRetryCount || failureRetryCount < 0) {
+                    for (Map.Entry<TopicPartition, Long> entry : firstValidOffsetsByPartition.entrySet()) {
+                        consumer.seek(entry.getKey(), entry.getValue());
+                    }
+                } else {
+                    log.warn("The batch offset set to the next record since failure retry count exceeded.");
+                    commitOffsets(lastPolledOffsetsByPartition, 1);
+                    dlqPublishedOffsets.clear();
+                    retryCounter = 0;
+                    injectErrorMessage("Failed to successfully mediate the batch message to/in the sequence: "
+                            + this.injectingSeq + " of Kafka Inbound Endpoint: " + name + ", even after "
+                            + failureRetryCount + " retries.", KafkaConstants.RETRY_EXHAUSTED, msgCtx);
+                }
+            }
+        }
+    }
+
+    /**
+     * Commit the given per-partition offsets adjusted by the provided delta.
+     */
+    private void commitOffsets(Map<TopicPartition, Long> offsets, long delta) {
+        Map<TopicPartition, OffsetAndMetadata> commitMap = new HashMap<>();
+        for (Map.Entry<TopicPartition, Long> entry : offsets.entrySet()) {
+            commitMap.put(entry.getKey(), new OffsetAndMetadata(entry.getValue() + delta));
+        }
+        consumer.commitSync(commitMap);
+    }
+
+    /**
+     * Build the batch payload for the given records, delegating to {@link #buildBatchXmlPayload},
+     * {@link #buildBatchJsonPayload}, or {@link #buildBatchTextPayload} based on the content type.
+     */
+    private String buildBatchPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        String type = contentType != null ? contentType.split(";")[0].trim() : "";
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_XML.equalsIgnoreCase(type)
+                || KafkaConstants.CONTENT_TYPE_TEXT_XML.equalsIgnoreCase(type)) {
+            return buildBatchXmlPayload(records);
+        }
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_JSON.equalsIgnoreCase(type)) {
+            return buildBatchJsonPayload(records);
+        }
+        return buildBatchTextPayload(records);
+    }
+
+    private String getBatchContentType() {
+        String type = contentType != null ? contentType.split(";")[0].trim() : "";
+        if (KafkaConstants.CONTENT_TYPE_APPLICATION_JSON.equalsIgnoreCase(type)) {
+            return contentType;
+        }
+        return KafkaConstants.CONTENT_TYPE_APPLICATION_XML;
+    }
+
+    /**
+     * Build a batch payload by wrapping each record's raw value, XML-escaped, in a text element
+     * inside the batch root element. Used when the content type is neither JSON nor XML.
+     *
+     * <p>Sample output for records with values {@code hello} and {@code world}:
+     * <pre>{@code
+     * <messages><text xmlns="http://ws.apache.org/commons/ns/payload">hello</text><text xmlns="http://ws.apache.org/commons/ns/payload">world</text></messages>
+     * }</pre>
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as an XML string with escaped text elements
+     */
+    private String buildBatchTextPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            sb.append(KafkaConstants.BATCH_TEXT_ELEMENT_START_TAG)
+                    .append(StringEscapeUtils.escapeXml10(recordValueToString(record.value())))
+                    .append(KafkaConstants.BATCH_TEXT_ELEMENT_END_TAG);
+        }
+        sb.append(KafkaConstants.BATCH_XML_ROOT_END_TAG);
+        return sb.toString();
+    }
+
+    /**
+     * Build a JSON array payload by concatenating each record's raw value as a JSON element.
+     *
+     * <p>Sample output for records with values {@code {"id":1}} and {@code {"id":2}}:
+     * <pre>{@code
+     * [{"id":1},{"id":2}]
+     * }</pre>
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as a JSON array string
+     */
+    private String buildBatchJsonPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < records.size(); i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append(recordValueToString(records.get(i).value()));
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /**
+     * Build an XML batch payload by concatenating each record's raw value, unescaped, inside the
+     * batch root element. Used when the content type is XML, so each record value is expected to
+     * already be well-formed XML.
+     *
+     * <p>Sample output for records with values {@code <order>1</order>} and {@code <order>2</order>}:
+     * <pre>{@code
+     * <messages><order>1</order><order>2</order></messages>
+     * }</pre>
+     *
+     * @param records records to include in the batch
+     * @return the batch payload as an XML string
+     */
+    private String buildBatchXmlPayload(List<ConsumerRecord<byte[], byte[]>> records) {
+        StringBuilder sb = new StringBuilder(KafkaConstants.BATCH_XML_ROOT_START_TAG);
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            sb.append(recordValueToString(record.value()));
+        }
+        sb.append(KafkaConstants.BATCH_XML_ROOT_END_TAG);
+        return sb.toString();
+    }
+
+    /**
+     * Convert a record value to its string representation. Byte arrays are decoded as UTF-8;
+     * any other type falls back to {@code toString()}.
+     *
+     * @param value the record value to convert
+     * @return the string representation of the value
+     */
+    private String recordValueToString(Object value) {
+        if (value instanceof byte[]) {
+            return new String((byte[]) value, StandardCharsets.UTF_8);
+        }
+        return value.toString();
+    }
+
+    private MessageContext createBatchMessageContext() {
+        MessageContext msgCtx = createMessageContext();
+        msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
+        msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
+        return msgCtx;
+    }
+
+    /**
      * Populate properties that are related to the functionality of Kafka Inbound Endpoint feature.
      *
      * @param properties properties configured in the Kafka Inbound Endpoint
      */
     private void populateOtherProperties(Properties properties) {
         checkDisableAutoCommit(properties);
+        isBatchEnabled = Boolean.parseBoolean(
+                properties.getProperty(KafkaConstants.BATCH_PROCESSING_ENABLED,
+                        KafkaConstants.BATCH_PROCESSING_ENABLED_DEFAULT));
         if (properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX) != null) {
             kafkaHeaderPrefix = properties.getProperty(KafkaConstants.KAFKA_HEADER_PREFIX).trim();
+        }
+        dlqTopic = properties.getProperty(KafkaConstants.DLQ_TOPIC);
+        if (isBatchEnabled && !StringUtils.isEmpty(dlqTopic)) {
+            dlqProducer = initDlqProducer();
+            log.info("DLQ producer initialized for Kafka Inbound Endpoint: " + name
+                    + ". Poison pills will be published to topic: " + dlqTopic);
         }
     }
 
@@ -331,12 +583,141 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Build a KafkaProducer for publishing poison pills to the DLQ topic.
+     * Reuses bootstrap.servers and all security (SSL/SASL) settings from the consumer config.
+     */
+    private KafkaProducer<byte[], byte[]> initDlqProducer() {
+        Properties producerProps = new Properties();
+        kafkaProperties.stringPropertyNames().stream()
+                .filter(ProducerConfig.configNames()::contains)
+                .forEach(key -> producerProps.put(key, kafkaProperties.getProperty(key)));
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                KafkaConstants.BYTE_ARRAY_SERIALIZER_CLASS);
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                KafkaConstants.BYTE_ARRAY_SERIALIZER_CLASS);
+        return new KafkaProducer<>(producerProps);
+    }
+
+    /**
+     * Publish a poison pill record to the configured DLQ topic.
+     * The DLQ record carries the original raw bytes as its value and provenance headers
+     * that follow the Spring Kafka DLT naming convention.
+     *
+     * @param record the poison pill ConsumerRecord
+     */
+    private void publishToDlq(ConsumerRecord<byte[], byte[]> record) {
+        if (dlqProducer == null) {
+            log.warn("No DLQ topic configured for Kafka Inbound Endpoint: " + name
+                    + ". Poison pill at topic=" + record.topic()
+                    + " partition=" + record.partition()
+                    + " offset=" + record.offset() + " will be skipped.");
+            return;
+        }
+
+        byte[] originalBytes = null;
+        String exceptionMessage = "Unknown deserialization error";
+        String causeMessage = "";
+
+        DeserializationException ex = readDeserializationException(record);
+        if (ex != null) {
+            originalBytes = ex.getData();
+            exceptionMessage = ex.getMessage();
+            if (ex.getCause() != null && ex.getCause().getMessage() != null) {
+                causeMessage = ex.getCause().getMessage();
+            }
+        }
+
+        List<Header> dlqHeaders = buildDlqHeaders(record, exceptionMessage, causeMessage);
+        ProducerRecord<byte[], byte[]> dlqRecord = new ProducerRecord<>(
+                dlqTopic, null, record.key(), originalBytes, dlqHeaders);
+
+        dlqProducer.send(dlqRecord, (metadata, exception) -> {
+            if (exception != null) {
+                log.error("Failed to publish poison pill to DLQ topic=" + dlqTopic
+                        + " from source topic=" + record.topic()
+                        + " offset=" + record.offset(), exception);
+            } else {
+                log.info("Poison pill published to DLQ topic=" + dlqTopic
+                        + " from source topic=" + record.topic()
+                        + " partition=" + record.partition()
+                        + " offset=" + record.offset());
+            }
+        });
+    }
+
+    /**
+     * Extracts the deserialization exception from the poison pill record headers.
+     * Checks the key deserializer exception header first, then the value deserializer exception header.
+     *
+     * @param record the poison pill ConsumerRecord
+     * @return the DeserializationException, or null if no exception header is present or it cannot be read
+     */
+    private DeserializationException readDeserializationException(ConsumerRecord<byte[], byte[]> record) {
+        Header exceptionHeader = record.headers().lastHeader(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER);
+        if (exceptionHeader == null) {
+            exceptionHeader = record.headers().lastHeader(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER);
+        }
+        if (exceptionHeader == null) {
+            return null;
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(exceptionHeader.value()))) {
+            Object obj = ois.readObject();
+            if (obj instanceof DeserializationException) {
+                return (DeserializationException) obj;
+            }
+            log.warn("Unexpected type in deserialization exception header: " + obj.getClass().getName()
+                    + " for topic=" + record.topic() + " offset=" + record.offset());
+            return null;
+        } catch (Exception e) {
+            log.warn("Could not read deserialization exception from poison pill header for topic="
+                    + record.topic() + " offset=" + record.offset(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Builds the header list for the DLQ record. Copies all original record headers except the internal
+     * deserialization exception headers, then appends provenance headers describing the origin of the
+     * poison pill and the deserialization failure.
+     *
+     * @param record           the original poison pill ConsumerRecord
+     * @param exceptionMessage the top-level deserialization error message
+     * @param causeMessage     the root cause message, or empty string if none
+     * @return the list of headers to attach to the DLQ ProducerRecord
+     */
+    private List<Header> buildDlqHeaders(ConsumerRecord<byte[], byte[]> record, String exceptionMessage,
+            String causeMessage) {
+        List<Header> dlqHeaders = new ArrayList<>();
+        for (Header h : record.headers()) {
+            if (!h.key().equals(KafkaConstants.KEY_DESERIALIZER_EXCEPTION_HEADER)
+                    && !h.key().equals(KafkaConstants.VALUE_DESERIALIZER_EXCEPTION_HEADER)) {
+                dlqHeaders.add(h);
+            }
+        }
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_TOPIC,
+                record.topic().getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_PARTITION,
+                String.valueOf(record.partition()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_OFFSET,
+                String.valueOf(record.offset()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_ORIGINAL_TIMESTAMP,
+                String.valueOf(record.timestamp()).getBytes(StandardCharsets.UTF_8)));
+        dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_EXCEPTION_MESSAGE,
+                exceptionMessage.getBytes(StandardCharsets.UTF_8)));
+        if (!causeMessage.isEmpty()) {
+            dlqHeaders.add(new RecordHeader(KafkaConstants.DLT_EXCEPTION_CAUSE_MESSAGE,
+                    causeMessage.getBytes(StandardCharsets.UTF_8)));
+        }
+        return dlqHeaders;
+    }
+
+    /**
      * Set the Kafka Records to a MessageContext
      *
      * @param record A Kafka record
      * @return MessageContext A message context with the record header values
      */
-    private MessageContext populateMessageContext(ConsumerRecord record) {
+    private MessageContext populateMessageContext(ConsumerRecord<byte[], byte[]> record) {
         MessageContext msgCtx = createMessageContext();
         msgCtx.setProperty(KafkaConstants.KAFKA_PARTITION_NO, record.partition());
         msgCtx.setProperty(KafkaConstants.KAFKA_MESSAGE_VALUE, record.value());
@@ -347,10 +728,6 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
         msgCtx.setProperty(KafkaConstants.KAFKA_TIMESTAMP_TYPE, record.timestampType());
         msgCtx.setProperty(KafkaConstants.KAFKA_TOPIC, record.topic());
         msgCtx.setProperty(KafkaConstants.KAFKA_KEY, record.key());
-        if (record.value() instanceof GenericData.Record) {
-            GenericData.Record val = (GenericData.Record) record.value();
-            msgCtx.setProperty(KafkaConstants.KAFKA_SCHEMA_NAME, val.getSchema().getFullName());
-        }
         msgCtx.setProperty(KafkaConstants.KAFKA_INBOUND_ENDPOINT_NAME, name);
         msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
         // Set the kafka headers to the message context
@@ -606,6 +983,16 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
             }
         } catch (Exception e) {
             log.error("Error while shutdown the Kafka consumer " + name + " " + e.getMessage(), e);
+        }
+        if (dlqProducer != null) {
+            try {
+                dlqProducer.close();
+                if (log.isDebugEnabled()) {
+                    log.debug("The DLQ producer has been closed for " + name);
+                }
+            } catch (Exception e) {
+                log.error("Error while closing the DLQ producer for " + name, e);
+            }
         }
     }
 

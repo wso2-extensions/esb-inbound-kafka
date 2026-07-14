@@ -158,6 +158,36 @@ public class KafkaConstants {
     public static final String DEFAULT_ERROR_HANDLING_DESERIALIZER_CLASS =
             "org.wso2.carbon.inbound.kafka.deserializer.ErrorHandlingDeserializer";
 
+    // Batch processing
+    public static final String BATCH_PROCESSING_ENABLED = "batch.processing.enabled";
+    public static final String BATCH_PROCESSING_ENABLED_DEFAULT = "false";
+
+    // Dead Letter Queue (DLQ) configuration
+    public static final String DLQ_TOPIC = "kafka.dlq.topic";
+
+    // DLT provenance headers
+    public static final String DLT_ORIGINAL_TOPIC = "kafka_dlt-original-topic";
+    public static final String DLT_ORIGINAL_PARTITION = "kafka_dlt-original-partition";
+    public static final String DLT_ORIGINAL_OFFSET = "kafka_dlt-original-offset";
+    public static final String DLT_ORIGINAL_TIMESTAMP = "kafka_dlt-original-timestamp";
+    public static final String DLT_EXCEPTION_MESSAGE = "kafka_dlt-exception-message";
+    public static final String DLT_EXCEPTION_CAUSE_MESSAGE = "kafka_dlt-exception-cause-message";
+    
+    public static final String BYTE_ARRAY_SERIALIZER_CLASS =
+            "org.apache.kafka.common.serialization.ByteArraySerializer";
+
+    // Batch payload content types
+    public static final String CONTENT_TYPE_APPLICATION_XML = "application/xml";
+    public static final String CONTENT_TYPE_TEXT_XML = "text/xml";
+    public static final String CONTENT_TYPE_APPLICATION_JSON = "application/json";
+
+    // Batch payload XML templates
+    public static final String BATCH_XML_ROOT_START_TAG = "<messages>";
+    public static final String BATCH_XML_ROOT_END_TAG = "</messages>";
+    public static final String BATCH_TEXT_ELEMENT_START_TAG =
+            "<text xmlns=\"http://ws.apache.org/commons/ns/payload\">";
+    public static final String BATCH_TEXT_ELEMENT_END_TAG = "</text>";
+
     // Error codes
     public static final String POISON_PILL_DETECTED = "700510";
     public static final String RETRY_EXHAUSTED = "700511";
