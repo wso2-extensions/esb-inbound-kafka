@@ -44,6 +44,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.io.ByteArrayOutputStream;
+import java.time.Duration;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
@@ -826,6 +827,37 @@ class KafkaMessageConsumerBatchTest {
             verify(mockKafkaConsumer).seek(tp, 7L);
             verify(mockKafkaConsumer, never()).commitSync(any(Map.class));
         }
+    }
+
+    // ── suspend configuration ───────────────────────────────────────────────────
+
+    @Test
+    void suspend_whenPropertySetToTrue_isPausedIsTrue() throws Exception {
+        Properties props = baseProps(true, false);
+        props.setProperty(KafkaConstants.SUSPEND, "true");
+        KafkaMessageConsumer c = new KafkaMessageConsumer(props, ENDPOINT_NAME,
+                synapseEnvironment, 1000L, INBOUND_SEQ, ERROR_SEQ, false, true);
+        assertTrue((Boolean) getField(c, "isPaused"),
+                "isPaused should be true when suspend property is set to true");
+    }
+
+    @Test
+    void suspend_whenPropertyAbsent_defaultIsFalse() throws Exception {
+        assertFalse((Boolean) getField(consumer, "isPaused"),
+                "isPaused should default to false when suspend property is absent");
+    }
+
+    @Test
+    void suspend_whenPropertySetToTrue_pollDoesNotConsumeRecords() throws Exception {
+        Properties props = baseProps(true, false);
+        props.setProperty(KafkaConstants.SUSPEND, "true");
+        KafkaMessageConsumer c = new KafkaMessageConsumer(props, ENDPOINT_NAME,
+                synapseEnvironment, 1000L, INBOUND_SEQ, ERROR_SEQ, false, true);
+        setField(c, "consumer", mockKafkaConsumer);
+
+        c.poll();
+
+        verify(mockKafkaConsumer, never()).poll(any(Duration.class));
     }
 
     // ── isBatchEnabled configuration ───────────────────────────────────────────
