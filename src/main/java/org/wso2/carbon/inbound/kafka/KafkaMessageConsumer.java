@@ -539,6 +539,10 @@ public class KafkaMessageConsumer extends GenericPollingConsumer {
      */
     private void populateOtherProperties(Properties properties) {
         checkDisableAutoCommit(properties);
+        isPaused = Boolean.parseBoolean(properties.getProperty(KafkaConstants.SUSPEND, "false"));
+        if (isPaused) {
+            log.info("Kafka consumer for " + name + " is suspended on startup due to 'suspend' parameter.");
+        }
         isBatchEnabled = Boolean.parseBoolean(
                 properties.getProperty(KafkaConstants.BATCH_PROCESSING_ENABLED,
                         KafkaConstants.BATCH_PROCESSING_ENABLED_DEFAULT));

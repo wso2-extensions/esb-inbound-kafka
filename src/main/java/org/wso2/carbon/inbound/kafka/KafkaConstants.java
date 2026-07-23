@@ -103,6 +103,7 @@ public class KafkaConstants {
     public static final String FAILURE_RETRY_COUNT = "failure.retry.count";
     public static final String FAILURE_RETRY_INTERVAL = "failure.retry.interval";
     public static final String TOPIC_PARTITIONS = "topic.partitions";
+    public static final String SUSPEND = "suspend";
     public static final String SASL_OAUTHBEARER_TOKEN_ENDPOINT = "sasl.oauthbearer.token.endpoint.url";
     public static final String SASL_OAUTHBEARER_SCOPE_CLAIM_NAME = "sasl.oauthbearer.scope.claim.name";
     public static final String SASL_LOGIN_CONNECT_TIMEOUT = "sasl.login.connect.timeout.ms";
